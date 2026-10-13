@@ -58,7 +58,18 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   onOpenInviteModal,
   onOpenProfileModal,
 }) => {
-  const { currentUser, currentHub, partnerUser, coupleViewLabel, partner1Label, partner2Label, updateHubName } = useAuth();
+  const { 
+    currentUser, 
+    currentHub, 
+    partnerUser, 
+    coupleViewLabel, 
+    partner1Label, 
+    partner2Label, 
+    partner1DisplayName, 
+    partner2DisplayName, 
+    updateHubName 
+  } = useAuth();
+  const isPartnerPending = !partnerUser || (!currentHub?.members || currentHub.members.length < 2);
   const [editingTemplate, setEditingTemplate] = useState<PlanTemplate | null>(null);
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const [newTaskInput, setNewTaskInput] = useState<string>('');
@@ -376,7 +387,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-xs cursor-pointer"
               >
                 <UserPlus className="w-3.5 h-3.5" />
-                <span>Invite Partner</span>
+                <span>Invite Partner{isPartnerPending ? ' (1)' : ''}</span>
               </button>
             )}
             {onOpenProfileModal && (
@@ -473,13 +484,22 @@ export const AdminPage: React.FC<AdminPageProps> = ({
           </div>
 
           <div className="p-3.5 rounded-xl bg-white dark:bg-[#202329] border border-[#e4ded5] dark:border-[#353943] space-y-1">
-            <span className="text-[10px] text-stone-500 font-mono block">Current Couple Perspective</span>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-stone-500 font-mono block">
+                {isPartnerPending ? 'Partner Invite (1)' : 'Partner & Perspective'}
+              </span>
+              {isPartnerPending && (
+                <span className="inline-flex items-center px-1.5 py-0.2 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 font-bold text-[10px]">
+                  1 pending
+                </span>
+              )}
+            </div>
             <span className="font-bold text-stone-900 dark:text-stone-100 block">
-              {partner1Label} & {partner2Label}
+              {partner1DisplayName} & {partner2DisplayName}
             </span>
             <span className="text-[11px] text-stone-500 dark:text-stone-400 block mt-1">
               {currentUser ? `${currentUser.name} (${currentUser.gender})` : 'You'}
-              {partnerUser ? ` • ${partnerUser.name} (${partnerUser.gender})` : ' • Partner pending'}
+              {partnerUser ? ` • ${partnerUser.name} (${partnerUser.gender})` : ' • Partner pending (1 invite required)'}
             </span>
           </div>
 

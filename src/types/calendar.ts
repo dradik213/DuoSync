@@ -65,6 +65,8 @@ export interface PlanTemplate {
     targetRevenue?: number;
     boothNumber?: string;
   };
+  createdBy?: string;
+  createdAt?: string;
 }
 
 export interface DayStayInfo {

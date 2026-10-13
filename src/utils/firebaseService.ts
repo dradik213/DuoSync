@@ -91,6 +91,14 @@ export async function createHubInFirestore(hub: SharedHub, user: UserAccount): P
 }
 
 /**
+ * Update an existing user in Firestore
+ */
+export async function saveUserToFirestore(user: UserAccount): Promise<void> {
+  const uid = user.id;
+  await setDoc(doc(db, 'users', uid), user, { merge: true });
+}
+
+/**
  * Find an existing hub by partner's invite code (case-insensitive lookup, supports with or without DUO- prefix)
  */
 export async function findHubByInviteCode(inviteCode: string): Promise<SharedHub | null> {

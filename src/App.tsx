@@ -18,6 +18,7 @@ import { LoginScreen } from './components/LoginScreen';
 import { InvitePartnerModal } from './components/InvitePartnerModal';
 import { EditProfileModal } from './components/EditProfileModal';
 import { GoogleWorkspaceModal } from './components/GoogleWorkspaceModal';
+import { UnifiedWorkspaceModal, UnifiedWorkspaceTab } from './components/UnifiedWorkspaceModal';
 import { GoogleTaskItem } from './utils/googleWorkspace';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { 
@@ -35,17 +36,56 @@ import { CalendarEvent, CalendarViewMode, DayStayInfo, EventCategory, EventSortO
 import { INITIAL_EVENTS, MOCK_STAYS } from './data/mockEvents';
 import { INITIAL_TEMPLATES } from './data/mockTemplates';
 import { formatReadableDate, formatDateToYMD } from './utils/calendarUtils';
-import { Eye } from 'lucide-react';
+import { Eye, Plus } from 'lucide-react';
 
 function CalendarApp() {
-  const { currentUser, currentHub } = useAuth();
-  // Default to today and Daily Schedule view per user instruction
+  const { currentUser, currentHub, updateProfile } = useAuth();
+  // Default to today and Daily Schedule view per user instruction with localStorage memory
   const [currentDate, setCurrentDate] = useState<Date>(() => new Date());
-  const [viewMode, setViewMode] = useState<CalendarViewMode>('agenda');
+  const [viewMode, setViewMode] = useState<CalendarViewMode>(() => {
+    try {
+      const saved = localStorage.getItem('duosync_view_mode');
+      if (saved && ['month', 'week', 'agenda', 'reflection'].includes(saved)) {
+        return saved as CalendarViewMode;
+      }
+    } catch (e) {}
+    return 'agenda';
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('duosync_view_mode', viewMode);
+    } catch (e) {}
+  }, [viewMode]);
+
   const [reflectionTimeframe, setReflectionTimeframe] = useState<'day' | 'week' | 'month' | 'all'>('month');
   
-  // Day / Night Theme (default to Day mode: soft warm linen)
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
+  // Day / Night Theme (Persisted per user account and localStorage)
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('duosync_theme_preference');
+      if (saved) return saved === 'dark';
+    } catch (e) {}
+    return false;
+  });
+
+  // Automatically sync theme when user profile loads or changes
+  useEffect(() => {
+    if (currentUser?.themePreference) {
+      setIsDarkMode(currentUser.themePreference === 'dark');
+    }
+  }, [currentUser?.id, currentUser?.themePreference]);
+
+  const handleToggleDarkMode = () => {
+    const nextMode = !isDarkMode;
+    setIsDarkMode(nextMode);
+    try {
+      localStorage.setItem('duosync_theme_preference', nextMode ? 'dark' : 'light');
+    } catch (e) {}
+    if (currentUser && updateProfile) {
+      updateProfile({ themePreference: nextMode ? 'dark' : 'light' });
+    }
+  };
 
   // Selected date defaults to today
   const [selectedDate, setSelectedDate] = useState<string>(() => formatDateToYMD(new Date()));
@@ -132,9 +172,36 @@ function CalendarApp() {
     });
   };
 
-  // Filters: 'all' | 'her' | 'him'
-  const [categoryFilter, setCategoryFilter] = useState<EventCategory | 'all'>('all');
-  const [partnerFilter, setPartnerFilter] = useState<'all' | 'her' | 'him'>('all');
+  // Filters: 'all' | 'her' | 'him' with persistent memory
+  const [categoryFilter, setCategoryFilter] = useState<EventCategory | 'all'>(() => {
+    try {
+      const saved = localStorage.getItem('duosync_category_filter');
+      if (saved) return saved as EventCategory | 'all';
+    } catch (e) {}
+    return 'all';
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('duosync_category_filter', categoryFilter);
+    } catch (e) {}
+  }, [categoryFilter]);
+
+  const [partnerFilter, setPartnerFilter] = useState<'all' | 'her' | 'him'>(() => {
+    try {
+      const saved = localStorage.getItem('duosync_partner_filter');
+      if (saved && ['all', 'her', 'him'].includes(saved)) {
+        return saved as 'all' | 'her' | 'him';
+      }
+    } catch (e) {}
+    return 'all';
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('duosync_partner_filter', partnerFilter);
+    } catch (e) {}
+  }, [partnerFilter]);
 
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
@@ -142,6 +209,8 @@ function CalendarApp() {
   const [isFridgePhotosOpen, setIsFridgePhotosOpen] = useState<boolean>(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState<boolean>(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
+  const [isUnifiedWorkspaceOpen, setIsUnifiedWorkspaceOpen] = useState<boolean>(false);
+  const [unifiedWorkspaceTab, setUnifiedWorkspaceTab] = useState<UnifiedWorkspaceTab>('templates');
   const [isWorkspaceModalOpen, setIsWorkspaceModalOpen] = useState<boolean>(false);
   const [workspaceInitialTab, setWorkspaceInitialTab] = useState<'ai_logger' | 'calendar' | 'tasks' | 'gmail' | 'chat'>('ai_logger');
   
@@ -187,6 +256,42 @@ function CalendarApp() {
     } catch (e) {}
   };
 
+  // Tracking viewed templates for partner template notifications
+  const [lastViewedTemplatesTime, setLastViewedTemplatesTime] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem(`duosync_last_viewed_templates_${currentUser?.id || 'default'}`);
+      if (saved) return Number(saved);
+    } catch (e) {}
+    return Date.now();
+  });
+
+  const handleTemplatesViewed = () => {
+    const now = Date.now();
+    setLastViewedTemplatesTime(now);
+    try {
+      if (currentUser?.id) {
+        localStorage.setItem(`duosync_last_viewed_templates_${currentUser.id}`, String(now));
+      }
+    } catch (e) {}
+  };
+
+  // Tracking whether user has already seen the partner invite alert (so red badge is non-persistent)
+  const [hasSeenPartnerInviteNotice, setHasSeenPartnerInviteNotice] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(`duosync_seen_partner_invite_${currentUser?.id || 'default'}`);
+      return saved === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+
+  const markPartnerInviteSeen = () => {
+    setHasSeenPartnerInviteNotice(true);
+    try {
+      localStorage.setItem(`duosync_seen_partner_invite_${currentUser?.id || 'default'}`, 'true');
+    } catch (e) {}
+  };
+
   // Count unread chats from partner (green badge marker)
   const unreadChatCount = useMemo(() => {
     if (!currentUser || !chatMessages || chatMessages.length === 0) return 0;
@@ -211,6 +316,64 @@ function CalendarApp() {
     });
     return count;
   }, [events]);
+
+  // Tab-specific notification counts across Unified Workspace (strictly authentic, non-persistent signals)
+  const workspaceNotifications = useMemo(() => {
+    // 1. Templates: ONLY count if partner created a new template since last view
+    const newPartnerTemplatesCount = templates.filter((t) => {
+      if (!t.createdBy || !currentUser) return false;
+      const isFromPartner = t.createdBy !== currentUser.id;
+      const createdTime = t.createdAt ? new Date(t.createdAt).getTime() : 0;
+      return isFromPartner && createdTime > lastViewedTemplatesTime;
+    }).length;
+
+    // 2. Admin: alert (1) ONLY if partner has not yet joined hub AND user hasn't seen the notice yet (non-persistent badge)
+    const isPartnerPending = (!currentHub || (currentHub.members && currentHub.members.length < 2));
+    const admin = (isPartnerPending && !hasSeenPartnerInviteNotice) ? 1 : 0;
+
+    // 3. Gemini: 0 by default; only alert if there are pending unreviewed AI suggestions
+    const gemini = 0;
+
+    // 4. Tasks: strictly overdue tasks (no fake badges for standard pending tasks)
+    const tasks = overdueTasksCount;
+
+    // 5. Calendar: 0 (unless calendar sync conflict)
+    const calendar = 0;
+
+    // 6. Gmail: 0 (unless urgent unread priority email)
+    const gmail = 0;
+
+    // 7. Chat: unread partner chat messages
+    const chat = unreadChatCount;
+
+    return {
+      templates: newPartnerTemplatesCount,
+      admin,
+      gemini,
+      tasks,
+      calendar,
+      gmail,
+      chat,
+    };
+  }, [templates, currentUser, lastViewedTemplatesTime, currentHub, hasSeenPartnerInviteNotice, overdueTasksCount, unreadChatCount]);
+
+  // Total notification sum displayed on the Pastel Heart button (only rendered if > 0)
+  const totalHeartNotifications = useMemo(() => {
+    return (
+      workspaceNotifications.templates +
+      workspaceNotifications.admin +
+      workspaceNotifications.gemini +
+      workspaceNotifications.tasks +
+      workspaceNotifications.calendar +
+      workspaceNotifications.gmail +
+      workspaceNotifications.chat
+    );
+  // Mark partner invite alert seen whenever user navigates to admin view or opens workspace
+  useEffect(() => {
+    if (viewMode === 'admin' || isUnifiedWorkspaceOpen || isInviteModalOpen) {
+      markPartnerInviteSeen();
+    }
+  }, [viewMode, isUnifiedWorkspaceOpen, isInviteModalOpen]);
 
   // Sync dark class on documentElement and body
   useEffect(() => {
@@ -242,7 +405,9 @@ function CalendarApp() {
   if (viewMode === 'admin') {
     navLabel = 'Hub Admin & Templates';
   } else if (isDayScope) {
-    navLabel = formatReadableDate(selectedDate);
+    const [sy, sm, sd] = selectedDate.split('-').map(Number);
+    const dateOnlyObj = new Date(sy, sm - 1, sd, 12, 0, 0);
+    navLabel = dateOnlyObj.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   } else if (isWeekScope) {
     navLabel = `${monday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${sunday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
   } else if (isAllScope) {
@@ -591,18 +756,25 @@ function CalendarApp() {
         onToggleSortDirection={handleToggleSortDirection}
         onOpenAddModal={() => handleOpenAddModal(selectedDate)}
         isDarkMode={isDarkMode}
-        onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
-        onOpenInviteModal={() => setIsInviteModalOpen(true)}
+        onToggleDarkMode={handleToggleDarkMode}
+        onOpenInviteModal={() => {
+          setIsInviteModalOpen(true);
+          markPartnerInviteSeen();
+        }}
         onOpenProfileModal={() => setIsProfileModalOpen(true)}
-        onOpenWorkspaceModal={() => {
-          setWorkspaceInitialTab('ai_logger');
-          setIsWorkspaceModalOpen(true);
+        onOpenUnifiedWorkspace={() => {
+          setUnifiedWorkspaceTab('templates');
+          setIsUnifiedWorkspaceOpen(true);
+          handleTemplatesViewed();
+          markPartnerInviteSeen();
         }}
         unreadChatCount={unreadChatCount}
         overdueTasksCount={overdueTasksCount}
+        totalHeartNotifications={totalHeartNotifications}
+        tabNotificationCounts={workspaceNotifications}
         onOpenChat={() => {
-          setWorkspaceInitialTab('chat');
-          setIsWorkspaceModalOpen(true);
+          setUnifiedWorkspaceTab('chat');
+          setIsUnifiedWorkspaceOpen(true);
           handleChatRead();
         }}
         selectedDate={selectedDate}
@@ -760,6 +932,17 @@ function CalendarApp() {
           </div>
         )}
       </main>
+ 
+      {/* Floating Action Button (+ Add) in bottom-right corner for 1-tap quick add */}
+      <button
+        type="button"
+        onClick={() => handleOpenAddModal(selectedDate)}
+        className="fixed bottom-6 right-6 sm:bottom-8 sm:right-8 z-40 w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-stone-900 hover:bg-stone-800 dark:bg-stone-100 dark:hover:bg-white text-white dark:text-stone-900 shadow-xl hover:shadow-2xl active:scale-95 transition-all flex items-center justify-center cursor-pointer group ring-2 ring-white/60 dark:ring-stone-900/40"
+        title="Add new event, task or stay (+)"
+        aria-label="Add new event, task or stay"
+      >
+        <Plus className="w-6 h-6 stroke-[2.5] group-hover:rotate-90 transition-transform duration-200" />
+      </button>
 
       {/* Add Activity Modal with dynamic templates & edit button */}
       <AddEventModal
@@ -790,24 +973,44 @@ function CalendarApp() {
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
         isDarkMode={isDarkMode}
-        onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
+        onToggleDarkMode={handleToggleDarkMode}
         onOpenWorkspaceModal={() => {
-          setWorkspaceInitialTab('ai_logger');
-          setIsWorkspaceModalOpen(true);
+          setUnifiedWorkspaceTab('gemini');
+          setIsUnifiedWorkspaceOpen(true);
         }}
       />
 
-      {/* Google Workspace, Calendar, Tasks Backlog, Gmail Intelligence & AI Logger */}
-      <GoogleWorkspaceModal
-        isOpen={isWorkspaceModalOpen}
-        onClose={() => setIsWorkspaceModalOpen(false)}
+      {/* Unified Workspace & Admin Full-Screen Modal Overlay */}
+      <UnifiedWorkspaceModal
+        isOpen={isUnifiedWorkspaceOpen}
+        onClose={() => setIsUnifiedWorkspaceOpen(false)}
+        initialTab={unifiedWorkspaceTab}
         selectedDate={selectedDate}
+        templates={templates}
+        onUpdateTemplate={handleUpdateTemplate}
+        onCreateTemplate={handleCreateTemplate}
+        onDeleteTemplate={handleDeleteTemplate}
+        onReorderTemplates={handleReorderTemplates}
+        onResetTemplates={handleResetTemplates}
+        onClearAllEventsAndStays={() => {
+          setEvents([]);
+          setStays({});
+          try {
+            localStorage.removeItem('hub_events');
+            localStorage.removeItem('hub_stays');
+          } catch (e) {}
+        }}
+        onOpenInviteModal={() => setIsInviteModalOpen(true)}
+        onOpenProfileModal={() => setIsProfileModalOpen(true)}
         onAddEventFromAI={handleSaveEvent}
         onImportGoogleTaskToBacklog={(taskTitle) => handleCopyTaskToDate(taskTitle, selectedDate, 'both')}
         onSyncGoogleTasks={handleSyncGoogleTasks}
         onMessagesUpdated={(msgs) => setChatMessages(msgs)}
         onChatRead={handleChatRead}
-        initialTab={workspaceInitialTab}
+        onTemplatesViewed={handleTemplatesViewed}
+        onPartnerInviteViewed={markPartnerInviteSeen}
+        unreadChatCount={unreadChatCount}
+        tabNotifications={workspaceNotifications}
       />
     </div>
   );

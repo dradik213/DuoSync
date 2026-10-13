@@ -58,7 +58,19 @@ export const SelectedDaySummaryWidget: React.FC<SelectedDaySummaryWidgetProps> =
   onFilterCategory,
   categoryFilter,
 }) => {
-  const { currentUser, partnerUser, coupleViewLabel, partner1Label, partner2Label, user1Theme, user2Theme } = useAuth();
+  const { 
+    currentUser, 
+    partnerUser, 
+    coupleViewLabel, 
+    partner1Label, 
+    partner2Label, 
+    partner1Initial, 
+    partner2Initial, 
+    partner1DisplayName, 
+    partner2DisplayName, 
+    user1Theme, 
+    user2Theme 
+  } = useAuth();
   
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
     try {
@@ -245,8 +257,11 @@ export const SelectedDaySummaryWidget: React.FC<SelectedDaySummaryWidgetProps> =
   const scheduledHours = Math.floor(totalScheduledMinutes / 60);
   const scheduledRemainingMins = totalScheduledMinutes % 60;
   const freeHours = Math.floor(freeMinutes / 60);
-  const freeRemainingMins = freeMinutes % 60;
   const percentCommitted = Math.min(100, Math.round((totalScheduledMinutes / wakingDayMinutes) * 100));
+
+  const [sy, sm, sd] = selectedDate.split('-').map(Number);
+  const targetDateObj = new Date(sy, sm - 1, sd, 12, 0, 0);
+  const dayOfWeekName = targetDateObj.toLocaleDateString('en-US', { weekday: 'long' });
 
   const formatTemp = (f: number | undefined) => {
     if (f == null) return '--';
@@ -296,15 +311,11 @@ export const SelectedDaySummaryWidget: React.FC<SelectedDaySummaryWidgetProps> =
       {/* Top Header / Bar */}
       <div className="p-2.5 sm:p-3 bg-gradient-to-r from-stone-50 via-white to-stone-50 dark:from-[#202329] dark:via-[#1c1f25] dark:to-[#202329] border-b border-[#e6e1d8] dark:border-[#2d3139] flex flex-wrap items-center justify-between gap-2.5">
         
-        {/* Left: Day Title & Overnight Stay Badges (No duplicate date selector arrows or go to today) */}
+        {/* Left: Day Title (Day of Week only) & Overnight Stay Badges */}
         <div className="flex items-center gap-2.5 flex-wrap">
           <div className="flex items-center gap-2">
-            <span className="text-[11px] font-mono uppercase tracking-wider font-semibold text-stone-500 dark:text-stone-400 flex items-center gap-1">
-              <CalendarIcon className="w-3.5 h-3.5" />
-              <span>Day Pulse:</span>
-            </span>
-            <h2 className="text-xs sm:text-sm font-bold text-stone-900 dark:text-stone-100 tracking-tight flex items-center gap-1.5">
-              <span>{formatReadableDate(selectedDate)}</span>
+            <h2 className="text-sm sm:text-base font-bold text-stone-900 dark:text-stone-100 tracking-tight flex items-center gap-2">
+              <span className="font-serif capitalize">{dayOfWeekName}</span>
               {isToday && (
                 <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.2 rounded-full bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 shadow-2xs">
                   Today
@@ -337,30 +348,37 @@ export const SelectedDaySummaryWidget: React.FC<SelectedDaySummaryWidgetProps> =
           )}
         </div>
 
-        {/* Right: Compact stats pill, °F/°C toggle, & Collapse toggle button (No secondary add button) */}
+        {/* Right: Compact stats double-spine (only when not expanded), °F/°C toggle, & Collapse toggle button */}
         <div className="flex items-center gap-2">
-          {/* Quick Snapshot Pills */}
-          <div className="flex items-center gap-1.5 text-xs text-stone-600 dark:text-stone-300">
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-stone-100 dark:bg-[#252830] font-medium border border-stone-200 dark:border-[#353943]">
-              <span className="text-sm leading-none">{moon.emoji}</span>
-              <span className="hidden sm:inline">{moon.name}</span>
-            </span>
-
-            {isWithinHorizon && dayForecast && (
-              <span 
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50/80 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 font-medium border border-amber-200 dark:border-amber-900/60"
-                title={`Live Radar for ${currentLocation.name}: High ${formatTemp(dayForecast.highTemp)}, Low ${formatTemp(dayForecast.lowTemp)}`}
-              >
-                {renderWeatherIcon(dayForecast.hourly[1]?.iconName || 'Sun', 'w-3 h-3')}
-                <span>{formatTemp(dayForecast.highTemp)}</span>
+          {/* Quick Snapshot Double-Spine Cards (visible when NOT expanded) */}
+          {isCollapsed && (
+            <div 
+              onClick={() => setIsCollapsed(false)}
+              className="flex items-center gap-1.5 text-xs text-stone-600 dark:text-stone-300 cursor-pointer"
+              title="Click to expand weather and astronomy details"
+            >
+              {/* Spine 1: Moon */}
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-stone-100 dark:bg-[#252830] font-medium border border-stone-200 dark:border-[#353943] hover:bg-stone-200 dark:hover:bg-[#2e323c] transition-colors">
+                <span className="text-sm leading-none">{moon.emoji}</span>
+                <span className="hidden sm:inline font-sans">{moon.name} ({moon.illumination}%)</span>
               </span>
-            )}
 
-            <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-stone-100 dark:bg-[#252830] font-medium border border-stone-200 dark:border-[#353943]">
-              <Clock className="w-3 h-3 text-stone-500" />
-              <span>{scheduledHours > 0 ? `${scheduledHours}h ` : ''}{scheduledRemainingMins}m scheduled</span>
-            </span>
-          </div>
+              {/* Spine 2: Radar Weather */}
+              {isWithinHorizon && dayForecast ? (
+                <span 
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50/90 dark:bg-amber-950/40 text-amber-900 dark:text-amber-300 font-medium border border-amber-200 dark:border-amber-900/60 hover:bg-amber-100 transition-colors"
+                  title={`Live Radar for ${currentLocation.name}: High ${formatTemp(dayForecast.highTemp)}, Low ${formatTemp(dayForecast.lowTemp)}`}
+                >
+                  {renderWeatherIcon(dayForecast.hourly[1]?.iconName || 'Sun', 'w-3 h-3')}
+                  <span>{formatTemp(dayForecast.highTemp)} / {formatTemp(dayForecast.lowTemp)}</span>
+                </span>
+              ) : (
+                <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-stone-100 dark:bg-[#252830] text-[11px] border border-stone-200 dark:border-[#353943]">
+                  <span>Weather</span>
+                </span>
+              )}
+            </div>
+          )}
 
           {/* °F / °C Switcher */}
           <button
@@ -377,7 +395,7 @@ export const SelectedDaySummaryWidget: React.FC<SelectedDaySummaryWidgetProps> =
             type="button"
             onClick={() => setIsCollapsed(!isCollapsed)}
             className="p-1 rounded-md border border-[#e2ddd5] dark:border-[#353943] bg-white dark:bg-[#252830] text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-[#2e323c] cursor-pointer transition-colors"
-            title={isCollapsed ? 'Expand Day Pulse & Summary' : 'Collapse Day Pulse'}
+            title={isCollapsed ? 'Expand Weather & Astronomy Cards' : 'Collapse Top Area'}
             aria-expanded={!isCollapsed}
           >
             {isCollapsed ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
@@ -385,102 +403,9 @@ export const SelectedDaySummaryWidget: React.FC<SelectedDaySummaryWidgetProps> =
         </div>
       </div>
 
-      {/* Main Widget Body (Expanded) */}
+      {/* Main Widget Body (Expanded) - 3 tightened columns */}
       {!isCollapsed && (
-        <div className="p-3 sm:p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 animate-in fade-in duration-200">
-          
-          {/* Card 1: Event Types & Schedule Breakdown */}
-          <div className="rounded-xl p-3 bg-stone-50/80 dark:bg-[#21242c] border border-stone-200/80 dark:border-[#2d3139] flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-stone-200 dark:border-[#2d3139]">
-                <span className="text-[11px] font-bold text-stone-900 dark:text-stone-100 flex items-center gap-1.5 uppercase tracking-wider font-mono">
-                  <Clock className="w-3 h-3 text-stone-600 dark:text-stone-400" />
-                  <span>Events & Time Spent</span>
-                </span>
-                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-md bg-stone-200/80 dark:bg-stone-800 text-stone-800 dark:text-stone-200">
-                  {dayEvents.length} {dayEvents.length === 1 ? 'event' : 'events'}
-                </span>
-              </div>
-
-              {/* Time scheduled vs free */}
-              <div className="space-y-1 mb-2.5">
-                <div className="flex justify-between text-xs">
-                  <span className="text-stone-600 dark:text-stone-400">Scheduled Time:</span>
-                  <span className="font-semibold text-stone-900 dark:text-stone-100">
-                    {scheduledHours}h {scheduledRemainingMins}m
-                  </span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-stone-600 dark:text-stone-400">Free Time Together:</span>
-                  <span className="font-semibold text-emerald-700 dark:text-emerald-400">
-                    {freeHours}h {freeRemainingMins}m
-                  </span>
-                </div>
-
-                {/* Progress bar */}
-                <div className="w-full bg-stone-200 dark:bg-stone-800 rounded-full h-1.5 overflow-hidden mt-1">
-                  <div 
-                    className="bg-purple-600 dark:bg-purple-500 h-1.5 rounded-full transition-all duration-300" 
-                    style={{ width: `${percentCommitted}%` }}
-                    title={`${percentCommitted}% of waking day committed`}
-                  />
-                </div>
-                <div className="text-[10px] text-stone-500 dark:text-stone-400 text-right">
-                  {percentCommitted}% of daylight hours committed
-                </div>
-              </div>
-
-              {/* Category Breakdown Chips */}
-              <div className="pt-2 border-t border-stone-200 dark:border-[#2d3139]">
-                <p className="text-[10px] font-semibold text-stone-500 dark:text-stone-400 mb-1 uppercase tracking-wider">
-                  Event Types Today
-                </p>
-                <div className="flex flex-wrap gap-1">
-                  {(['market', 'dinner_date', 'pets', 'grocery_errand', 'maintenance', 'other'] as EventCategory[]).map((cat) => {
-                    const cfg = CATEGORY_CONFIG[cat];
-                    const stat = categoryStats[cat];
-                    if (!stat || stat.count === 0) return null;
-                    return (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => onFilterCategory && onFilterCategory(categoryFilter === cat ? 'all' : cat)}
-                        className={`text-[10px] px-2 py-0.5 rounded-md border font-medium transition-all flex items-center gap-1 cursor-pointer ${cfg.badgeBg} ${cfg.borderColor} ${cfg.textColor}`}
-                        title={`Filter by ${cfg.label}`}
-                      >
-                        <span>{cfg.shortLabel}</span>
-                        <span className="font-bold">({stat.count})</span>
-                        <span className="opacity-75 text-[9px]">· {Math.round(stat.minutes / 60 * 10) / 10}h</span>
-                      </button>
-                    );
-                  })}
-                  {dayEvents.length === 0 && (
-                    <span className="text-xs text-stone-500 dark:text-stone-400 italic">
-                      No events scheduled — open schedule!
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Event list quick preview */}
-            {dayEvents.length > 0 && (
-              <div className="mt-2.5 pt-1.5 border-t border-stone-200 dark:border-[#2d3139] text-[10px] text-stone-600 dark:text-stone-400 space-y-0.5">
-                {dayEvents.slice(0, 2).map((evt) => (
-                  <div key={evt.id} className="truncate flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-purple-500 shrink-0" />
-                    <span className="font-semibold text-stone-800 dark:text-stone-200">{evt.startTime ? `${formatUsTime(evt.startTime)}:` : ''}</span>
-                    <span className="truncate">{evt.title}</span>
-                  </div>
-                ))}
-                {dayEvents.length > 2 && (
-                  <div className="text-[10px] text-stone-500 italic">
-                    +{dayEvents.length - 2} more events
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+        <div className="p-3 sm:p-4 grid grid-cols-1 md:grid-cols-3 gap-3 animate-in fade-in duration-200">
 
           {/* Card 2: Phrase of the Day / Motivational Quote */}
           <div className="rounded-xl p-3 bg-stone-50/80 dark:bg-[#21242c] border border-stone-200/80 dark:border-[#2d3139] flex flex-col justify-between">

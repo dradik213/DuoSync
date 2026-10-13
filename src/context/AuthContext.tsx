@@ -7,6 +7,7 @@ import {
   joinHubInFirestore, 
   subscribeToHub,
   updateHubInFirestore,
+  saveUserToFirestore,
   db
 } from '../utils/firebaseService';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
@@ -20,6 +21,10 @@ interface AuthContextType {
   coupleViewLabel: string;
   partner1Label: string;
   partner2Label: string;
+  partner1Initial: string;
+  partner2Initial: string;
+  partner1DisplayName: string;
+  partner2DisplayName: string;
   user1Theme: UserColorTheme;
   user2Theme: UserColorTheme;
   login: (email: string) => Promise<{ success: boolean; error?: string }>;
@@ -181,6 +186,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const partner2Label = partnerUser 
     ? (isSamePronoun ? `${partnerPronouns.shortLabel} (${partnerUser.name})` : partnerPronouns.possessive)
     : 'Partner';
+
+  const partner1Initial = currentUser?.name?.trim() 
+    ? currentUser.name.trim().charAt(0).toUpperCase() 
+    : 'U';
+  const partner2Initial = partnerUser?.name?.trim() 
+    ? partnerUser.name.trim().charAt(0).toUpperCase() 
+    : 'P';
+  const partner1DisplayName = currentUser?.name || partner1Label;
+  const partner2DisplayName = partnerUser?.name || partner2Label;
 
   // Dynamic color theme referencing color specified in user's profile
   // User 1 is currentUser (on left side of slider)
@@ -482,6 +496,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return h;
       })
     );
+    try {
+      saveUserToFirestore(updatedUser).catch((err) => {
+        console.warn('Failed to save user profile in Firestore:', err);
+      });
+    } catch (e) {}
   };
 
   const updateHubName = (name: string) => {
@@ -554,6 +573,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         coupleViewLabel,
         partner1Label,
         partner2Label,
+        partner1Initial,
+        partner2Initial,
+        partner1DisplayName,
+        partner2DisplayName,
         user1Theme,
         user2Theme,
         login,

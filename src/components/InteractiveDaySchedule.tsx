@@ -78,7 +78,16 @@ export const InteractiveDaySchedule: React.FC<InteractiveDayScheduleProps> = ({
   sortDirection = 'none',
 }) => {
   // Expanded card tracking - default the first event to expanded
-  const { partner1Label, partner2Label, user1Theme, user2Theme } = useAuth();
+  const { 
+    partner1Label, 
+    partner2Label, 
+    partner1Initial, 
+    partner2Initial, 
+    partner1DisplayName, 
+    partner2DisplayName, 
+    user1Theme, 
+    user2Theme 
+  } = useAuth();
   const [expandedEventIds, setExpandedEventIds] = useState<Record<string, boolean>>({});
   const [dayNotes, setDayNotes] = useState(stays[selectedDate]?.notes || '');
   const [newTaskInputs, setNewTaskInputs] = useState<Record<string, string>>({});
@@ -244,42 +253,43 @@ export const InteractiveDaySchedule: React.FC<InteractiveDayScheduleProps> = ({
   return (
     <div className="space-y-4">
       
-      {/* Schedule Page Utility Bar: Overnight Stay Slider & Photos */}
-      <div className="bg-[#fcfaf7] dark:bg-[#1a1d22] border border-[#e4ded5] dark:border-[#2d3139] rounded-xl p-3 sm:p-3.5 shadow-2xs flex flex-wrap items-center justify-between gap-3 transition-colors">
-        {/* Overnight Stay Slider: Hers / His / Home (meaning our own home), matching view filter */}
-        <div className="flex items-center gap-2 bg-[#f5f1e8] dark:bg-[#202329] px-2.5 py-1.5 rounded-lg border border-[#e4ded5] dark:border-[#2d3139] text-xs">
+      {/* Schedule Page Utility Bar: Overnight Stay Slider & Icon-Only Photos */}
+      <div className="bg-[#fcfaf7] dark:bg-[#1a1d22] border border-[#e4ded5] dark:border-[#2d3139] rounded-xl p-2.5 sm:p-3 shadow-2xs flex items-center justify-between gap-2.5 transition-colors">
+        {/* Overnight Stay Slider: Hers (Left) / Home (Center) / His (Right) */}
+        <div className="flex items-center gap-2 bg-[#f5f1e8] dark:bg-[#202329] px-2.5 py-1 rounded-lg border border-[#e4ded5] dark:border-[#2d3139] text-xs">
           <Home className="w-3.5 h-3.5 text-stone-500" />
-          <span className="text-[11px] font-medium text-stone-600 dark:text-stone-400">Stay:</span>
+          <span className="text-[11px] font-medium text-stone-600 dark:text-stone-400 hidden xs:inline">Stay:</span>
           
           <div className="flex items-center gap-1.5 bg-[#ede8df]/70 dark:bg-[#1a1d22] px-2 py-0.5 rounded-md border border-[#e4ded5] dark:border-[#2d3139]">
-            {/* Button 1: partner1Label */}
+            {/* Left Partner Initial */}
             <button
               type="button"
-              onClick={() => onUpdateStay(selectedDate, 'her_home')}
-              className={`text-[11px] font-semibold transition-colors cursor-pointer px-1.5 py-0.5 rounded ${
+              onClick={() => onUpdateStay(selectedDate, currentStay === 'her_home' ? 'our_home' : 'her_home')}
+              className={`w-5 h-5 flex items-center justify-center text-[11px] font-bold rounded-md transition-all cursor-pointer ${
                 currentStay === 'her_home'
-                  ? `${user1Theme.activeText} ${user1Theme.activeBg}`
-                  : `text-stone-500 dark:text-stone-400 ${user1Theme.hoverText}`
+                  ? `${user1Theme.activeText} ${user1Theme.activeBg} ring-1 ring-stone-400/40 dark:ring-stone-500/40 shadow-xs`
+                  : `text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-200/60 dark:hover:bg-stone-700/60`
               }`}
-              title={`Stay at ${partner1Label}`}
+              title={`Stay at ${partner1DisplayName}'s (click again for Home)`}
+              aria-label={`Stay at ${partner1DisplayName}'s`}
             >
-              {partner1Label}
+              {partner1Initial}
             </button>
 
-            {/* 3-Position Slider Switch Toggle */}
+            {/* 3-Position Slider Switch: Left=Partner 1 Initial, Center=Home, Right=Partner 2 Initial */}
             <button
               type="button"
               role="switch"
-              aria-label="Toggle overnight stay"
+              aria-label={`Overnight stay: ${currentStay === 'our_home' ? 'Home (Center)' : currentStay === 'her_home' ? partner1DisplayName : partner2DisplayName}`}
               onClick={handleCycleStay}
-              className={`relative inline-flex h-5 w-11 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${
+              className={`relative inline-flex h-5 w-12 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${
                 currentStay === 'her_home'
                   ? user1Theme.sliderTrack
                   : currentStay === 'his_home'
                   ? user2Theme.sliderTrack
-                  : 'bg-black dark:bg-stone-900 border border-stone-800'
+                  : 'bg-stone-700 dark:bg-stone-600 ring-1 ring-stone-500/50'
               }`}
-              title={`Current Stay: ${currentStay === 'her_home' ? partner1Label : currentStay === 'his_home' ? partner2Label : 'Home (Our own home)'} (Click to cycle)`}
+              title={`Current Stay: ${currentStay === 'our_home' ? 'Home (Center)' : currentStay === 'her_home' ? partner1DisplayName : partner2DisplayName} (Click to cycle)`}
             >
               <span
                 aria-hidden="true"
@@ -287,51 +297,44 @@ export const InteractiveDaySchedule: React.FC<InteractiveDayScheduleProps> = ({
                   currentStay === 'her_home'
                     ? 'translate-x-0.5'
                     : currentStay === 'his_home'
-                    ? 'translate-x-6'
-                    : 'translate-x-3.25'
+                    ? 'translate-x-[30px]'
+                    : 'translate-x-[16px] ring-1 ring-stone-400/50'
                 }`}
               />
             </button>
 
-            {/* Button 2: partner2Label */}
+            {/* Right Partner Initial */}
             <button
               type="button"
-              onClick={() => onUpdateStay(selectedDate, 'his_home')}
-              className={`text-[11px] font-semibold transition-colors cursor-pointer px-1.5 py-0.5 rounded ${
+              onClick={() => onUpdateStay(selectedDate, currentStay === 'his_home' ? 'our_home' : 'his_home')}
+              className={`w-5 h-5 flex items-center justify-center text-[11px] font-bold rounded-md transition-all cursor-pointer ${
                 currentStay === 'his_home'
-                  ? `${user2Theme.activeText} ${user2Theme.activeBg}`
-                  : `text-stone-500 dark:text-stone-400 ${user2Theme.hoverText}`
+                  ? `${user2Theme.activeText} ${user2Theme.activeBg} ring-1 ring-stone-400/40 dark:ring-stone-500/40 shadow-xs`
+                  : `text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-200/60 dark:hover:bg-stone-700/60`
               }`}
-              title={`Stay at ${partner2Label}`}
+              title={`Stay at ${partner2DisplayName}'s (click again for Home)`}
+              aria-label={`Stay at ${partner2DisplayName}'s`}
             >
-              {partner2Label}
-            </button>
-
-            {/* Button 3: Home (meaning our own home) - solid black when active */}
-            <button
-              type="button"
-              onClick={() => onUpdateStay(selectedDate, 'our_home')}
-              className={`text-[10px] font-semibold px-2 py-0.5 rounded transition-all cursor-pointer ${
-                currentStay === 'our_home'
-                  ? 'bg-black text-white dark:bg-stone-900 dark:text-white shadow-2xs font-bold'
-                  : 'text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200'
-              }`}
-              title="Our own home"
-            >
-              Home
+              {partner2Initial}
             </button>
           </div>
         </div>
 
-        {/* Photo Button (Moon phase already presented in Day Pulse widget) */}
+        {/* Icon-Only Photo Button: kept just the icon to the right of the slider for stay */}
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={onOpenFridgePhotos}
-            className="inline-flex items-center gap-1.5 text-xs font-medium bg-white dark:bg-[#252830] hover:bg-stone-100 dark:hover:bg-[#2e323c] text-stone-700 dark:text-stone-200 px-3 py-1.5 rounded-lg border border-[#e4ded5] dark:border-[#353943] shadow-2xs transition-colors cursor-pointer"
+            className="relative p-2 rounded-lg bg-white dark:bg-[#252830] hover:bg-stone-100 dark:hover:bg-[#2e323c] text-stone-700 dark:text-stone-200 border border-[#e4ded5] dark:border-[#353943] shadow-2xs transition-colors cursor-pointer shrink-0"
+            title={`Fridge Photos${photoCount > 0 ? ` (${photoCount})` : ''}`}
+            aria-label={`Fridge Photos${photoCount > 0 ? ` (${photoCount})` : ''}`}
           >
-            <Camera className="w-3.5 h-3.5 text-stone-500 dark:text-stone-400" />
-            <span>Photos {photoCount > 0 ? `(${photoCount})` : ''}</span>
+            <Camera className="w-4 h-4 text-stone-600 dark:text-stone-400" />
+            {photoCount > 0 && (
+              <span className="absolute -top-1 -right-1 flex min-w-[15px] h-[15px] px-1 items-center justify-center rounded-full bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 text-[9px] font-bold shadow-xs">
+                {photoCount}
+              </span>
+            )}
           </button>
         </div>
       </div>

@@ -16,6 +16,7 @@ export interface UserAccount {
   avatarColor: string; // Tailwind color class or hex
   hubId: string;
   role: 'owner' | 'partner';
+  themePreference?: 'dark' | 'light';
   createdAt: string;
 }
 

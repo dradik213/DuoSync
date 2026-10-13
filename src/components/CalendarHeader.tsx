@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { 
   ChevronLeft, 
   ChevronRight, 
-  Plus, 
   Heart,
   Store,
   Wrench,
@@ -25,7 +24,8 @@ import {
   Sparkles,
   MessageSquare,
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
+  Layers
 } from 'lucide-react';
 import { CalendarEvent, CalendarViewMode, DayStayInfo, EventCategory, EventSortOption, SortDirection } from '../types/calendar';
 import { CATEGORY_CONFIG } from '../utils/calendarUtils';
@@ -54,8 +54,19 @@ interface CalendarHeaderProps {
   onOpenInviteModal?: () => void;
   onOpenProfileModal?: () => void;
   onOpenWorkspaceModal?: () => void;
+  onOpenUnifiedWorkspace?: () => void;
   unreadChatCount?: number;
   overdueTasksCount?: number;
+  totalHeartNotifications?: number;
+  tabNotificationCounts?: {
+    templates?: number;
+    admin?: number;
+    gemini?: number;
+    tasks?: number;
+    calendar?: number;
+    gmail?: number;
+    chat?: number;
+  };
   onOpenChat?: () => void;
   selectedDate?: string;
   events?: CalendarEvent[];
@@ -84,8 +95,11 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
   onOpenInviteModal,
   onOpenProfileModal,
   onOpenWorkspaceModal,
+  onOpenUnifiedWorkspace,
   unreadChatCount = 0,
   overdueTasksCount = 0,
+  totalHeartNotifications,
+  tabNotificationCounts,
   onOpenChat,
   selectedDate,
   events,
@@ -98,6 +112,10 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
     coupleViewLabel, 
     partner1Label, 
     partner2Label, 
+    partner1Initial,
+    partner2Initial,
+    partner1DisplayName,
+    partner2DisplayName,
     user1Theme, 
     user2Theme, 
     logout, 
@@ -106,15 +124,22 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
   const [showUserMenu, setShowUserMenu] = useState(false);
   const categoryKeys: EventCategory[] = ['market', 'dinner_date', 'maintenance', 'pets', 'grocery_errand', 'other'];
 
+  // Sum of critical notifications across all tabs or fallback to chat + tasks
+  const totalNotifications = totalHeartNotifications ?? (
+    (tabNotificationCounts 
+      ? Object.values(tabNotificationCounts).reduce((sum, n) => sum + (n || 0), 0)
+      : (unreadChatCount + overdueTasksCount))
+  );
+
   const getCategoryIcon = (key: EventCategory) => {
     switch (key) {
-      case 'market': return <Store className="w-3 h-3" />;
-      case 'dinner_date': return <UtensilsCrossed className="w-3 h-3" />;
-      case 'maintenance': return <Wrench className="w-3 h-3" />;
-      case 'pets': return <PawPrint className="w-3 h-3" />;
-      case 'packing': return <PawPrint className="w-3 h-3" />;
-      case 'grocery_errand': return <ShoppingCart className="w-3 h-3" />;
-      default: return <CalendarIcon className="w-3 h-3" />;
+      case 'market': return <Store className="w-3.5 h-3.5" />;
+      case 'dinner_date': return <UtensilsCrossed className="w-3.5 h-3.5" />;
+      case 'maintenance': return <Wrench className="w-3.5 h-3.5" />;
+      case 'pets': return <PawPrint className="w-3.5 h-3.5" />;
+      case 'packing': return <PawPrint className="w-3.5 h-3.5" />;
+      case 'grocery_errand': return <ShoppingCart className="w-3.5 h-3.5" />;
+      default: return <CalendarIcon className="w-3.5 h-3.5" />;
     }
   };
 
@@ -151,26 +176,104 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
 
   return (
     <header className="border-b border-[#e5e0d8] dark:border-[#2d3139] bg-[#fbf9f5]/95 dark:bg-[#181a1e]/95 backdrop-blur-md sticky top-0 z-30 transition-colors">
-      {/* Top Bar: Brand ("Shared Life Hub"), View Modes, Day/Night toggle & The ONLY Add Button */}
-      <div className="w-full max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex flex-wrap items-center justify-between gap-3">
+      {/* Top Bar: Reorganized for mobile & desktop with +Add on Top-Left, Soft Pastel Heart, and Non-Wrapping Layout */}
+      <div className="w-full max-w-[1800px] mx-auto px-3 sm:px-6 lg:px-8 py-2.5 flex items-center justify-between gap-2 sm:gap-3">
         
-        {/* Title: Shared Life Hub, User, Shared Admin, His & Partner, Workspace */}
-        <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
-          <h1 className="text-lg font-serif font-bold tracking-tight text-stone-900 dark:text-stone-100">
-            Shared Life Hub
-          </h1>
+        {/* Left Side: + Add Button, Soft Blush Rose Pastel Heart, Shared Life Hub */}
+        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+          {/* Soft Blush Rose Pastel Heart Button */}
+          <button
+            type="button"
+            onClick={onOpenUnifiedWorkspace || onOpenWorkspaceModal}
+            className="relative flex items-center justify-center p-2 rounded-xl bg-rose-50 hover:bg-rose-100/90 dark:bg-rose-950/40 dark:hover:bg-rose-900/50 text-rose-600 dark:text-rose-300 border border-rose-200/90 dark:border-rose-800/60 shadow-2xs hover:shadow-xs hover:border-rose-300 dark:hover:border-rose-700 active:scale-95 transition-all cursor-pointer group shrink-0"
+            title={`Open Unified Workspace & Admin (${totalNotifications} notification${totalNotifications === 1 ? '' : 's'})`}
+            aria-label={`Open Unified Workspace & Admin (${totalNotifications} notifications)`}
+          >
+            <Heart className="w-4 h-4 fill-rose-300/60 text-rose-500 drop-shadow-2xs group-hover:scale-105 transition-transform" />
+            {totalNotifications > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 flex min-w-[17px] h-[17px] px-1 items-center justify-center rounded-full bg-stone-900 dark:bg-white text-white dark:text-stone-900 text-[10px] font-bold ring-2 ring-[#fbf9f5] dark:ring-[#181a1e] shadow-xs">
+                {totalNotifications > 99 ? '99+' : totalNotifications}
+              </span>
+            )}
+          </button>
 
-          {/* User Account Button (e.g. Dustin) */}
+          {/* Brand Title: Synchronized with currentHub?.name from Admin */}
+          <h1 className="text-sm sm:text-base md:text-lg font-serif font-bold tracking-tight text-stone-900 dark:text-stone-100 truncate">
+            {currentHub?.name || 'Shared Life Hub'}
+          </h1>
+        </div>
+
+        {/* Right Side: Responsive View Switcher & Compact Avatar (User name removed to prevent mobile wrapping) */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          
+          {/* Segmented View Control - Compact on mobile, full on desktop */}
+          <div className="flex items-center bg-stone-200/60 dark:bg-[#24272f] p-0.5 rounded-lg text-xs font-medium text-stone-600 dark:text-stone-400">
+            <button
+              type="button"
+              onClick={() => onViewModeChange('agenda')}
+              className={`px-2 sm:px-3 py-1.5 rounded-md transition-all cursor-pointer ${
+                viewMode === 'agenda'
+                  ? 'bg-white dark:bg-[#2e323c] text-stone-900 dark:text-stone-100 shadow-2xs font-semibold'
+                  : 'hover:text-stone-900 dark:hover:text-stone-200'
+              }`}
+              title="Daily Schedule"
+            >
+              <span className="sm:hidden">Day</span>
+              <span className="hidden sm:inline">Daily Schedule</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onViewModeChange('week')}
+              className={`px-2 sm:px-3 py-1.5 rounded-md transition-all cursor-pointer ${
+                viewMode === 'week'
+                  ? 'bg-white dark:bg-[#2e323c] text-stone-900 dark:text-stone-100 shadow-2xs font-semibold'
+                  : 'hover:text-stone-900 dark:hover:text-stone-200'
+              }`}
+              title="Week Flow"
+            >
+              <span className="sm:hidden">Week</span>
+              <span className="hidden sm:inline">Week Flow</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onViewModeChange('month')}
+              className={`px-2 sm:px-3 py-1.5 rounded-md transition-all cursor-pointer ${
+                viewMode === 'month'
+                  ? 'bg-white dark:bg-[#2e323c] text-stone-900 dark:text-stone-100 shadow-2xs font-semibold'
+                  : 'hover:text-stone-900 dark:hover:text-stone-200'
+              }`}
+              title="Monthly Review"
+            >
+              <span className="sm:hidden">Month</span>
+              <span className="hidden sm:inline">Monthly Review</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onViewModeChange('reflection')}
+              className={`px-2 sm:px-3 py-1.5 rounded-md transition-all cursor-pointer ${
+                viewMode === 'reflection'
+                  ? 'bg-white dark:bg-[#2e323c] text-stone-900 dark:text-stone-100 shadow-2xs font-semibold'
+                  : 'hover:text-stone-900 dark:hover:text-stone-200'
+              }`}
+              title="Reflect & Summary"
+            >
+              <span className="sm:hidden">Reflect</span>
+              <span className="hidden sm:inline">Reflect & Summary</span>
+            </button>
+          </div>
+
+          {/* User Account Button: Clean Avatar circle without name text clutter in top bar */}
           {currentUser && (
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setShowUserMenu(!showUserMenu)}
-                className="relative flex items-center gap-1.5 p-1 pr-2 rounded-lg border border-[#e5e0d8] dark:border-[#353943] bg-white dark:bg-[#202329] hover:bg-stone-50 dark:hover:bg-[#2a2e36] text-xs font-medium cursor-pointer shadow-2xs transition-all"
+                className="relative flex items-center justify-center p-1 rounded-lg border border-[#e5e0d8] dark:border-[#353943] bg-white dark:bg-[#202329] hover:bg-stone-50 dark:hover:bg-[#2a2e36] cursor-pointer shadow-2xs transition-all shrink-0"
                 title={`Account: ${currentUser.name} (${currentUser.gender})`}
+                aria-label={`Account menu for ${currentUser.name}`}
               >
                 <div className="relative">
-                  <div className={`w-5 h-5 rounded-full ${currentUser.avatarColor || 'bg-purple-600'} text-white flex items-center justify-center font-bold text-[10px]`}>
+                  <div className={`w-6 h-6 rounded-full ${currentUser.avatarColor || 'bg-purple-600'} text-white flex items-center justify-center font-bold text-[11px]`}>
                     {currentUser.name[0]}
                   </div>
 
@@ -191,16 +294,12 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
                     </span>
                   ) : null}
                 </div>
-
-                <span className="max-w-[70px] truncate text-stone-800 dark:text-stone-200 font-semibold text-[11px]">
-                  {currentUser.name}
-                </span>
               </button>
 
               {/* User Dropdown */}
               {showUserMenu && (
                 <div 
-                  className="absolute left-0 mt-1 w-64 bg-white dark:bg-[#1a1d22] border border-[#e4ded5] dark:border-[#2d3139] rounded-xl shadow-xl py-2 z-50 text-xs animate-in fade-in"
+                  className="absolute right-0 mt-1 w-64 bg-white dark:bg-[#1a1d22] border border-[#e4ded5] dark:border-[#2d3139] rounded-xl shadow-xl py-2 z-50 text-xs animate-in fade-in"
                   onClick={() => setShowUserMenu(false)}
                 >
                   <div className="px-3.5 py-2 border-b border-[#e4ded5] dark:border-[#2d3139]">
@@ -321,104 +420,6 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
             </div>
           )}
 
-          {/* Shared Admin Button using the heart shared icon */}
-          <button
-            type="button"
-            onClick={() => onViewModeChange('admin')}
-            className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-md transition-all cursor-pointer shadow-2xs ${
-              viewMode === 'admin'
-                ? 'bg-rose-600 text-white shadow-xs'
-                : 'text-stone-700 dark:text-stone-300 bg-stone-200/70 dark:bg-stone-800 hover:bg-stone-300 dark:hover:bg-stone-700'
-            }`}
-            title="Open Shared Admin"
-          >
-            <Heart className={`w-2.5 h-2.5 ${viewMode === 'admin' ? 'text-white fill-white' : 'text-rose-500 fill-rose-500'}`} />
-            <span>Shared Admin</span>
-          </button>
-
-          {/* Dynamic Couple View reference badge: His & Partner */}
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-100/70 dark:bg-purple-950/50 border border-purple-200 dark:border-purple-800/80 text-[11px] text-purple-900 dark:text-purple-300 font-semibold shadow-2xs">
-            <Users className="w-3 h-3 text-purple-600 dark:text-purple-400" />
-            <span>{coupleViewLabel}</span>
-          </div>
-
-          {/* Workspace Button (Where AI and Google integration items go) */}
-          {onOpenWorkspaceModal && (
-            <button
-              type="button"
-              onClick={onOpenWorkspaceModal}
-              className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-md transition-all cursor-pointer shadow-2xs text-stone-700 dark:text-stone-300 bg-purple-100/80 dark:bg-purple-950/60 hover:bg-purple-200 dark:hover:bg-purple-900/60 border border-purple-200 dark:border-purple-800/80"
-              title="Open Workspace (AI Calendar Logger, Google Tasks, Gmail & Sync)"
-            >
-              <Sparkles className="w-3 h-3 text-purple-600 dark:text-purple-400" />
-              <span>Workspace</span>
-              {unreadChatCount > 0 && (
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              )}
-            </button>
-          )}
-        </div>
-
-        {/* View Switcher & The ONLY Add Button on the top right */}
-        <div className="flex items-center gap-2 flex-wrap">
-          
-          {/* Segmented View Control - Daily Schedule, Week Flow, Monthly Review, Reflect & Summary */}
-          <div className="flex items-center bg-stone-200/60 dark:bg-[#24272f] p-0.5 rounded-lg text-xs font-medium text-stone-600 dark:text-stone-400">
-            <button
-              type="button"
-              onClick={() => onViewModeChange('agenda')}
-              className={`px-3 py-1.5 rounded-md transition-all cursor-pointer ${
-                viewMode === 'agenda'
-                  ? 'bg-white dark:bg-[#2e323c] text-stone-900 dark:text-stone-100 shadow-2xs font-semibold'
-                  : 'hover:text-stone-900 dark:hover:text-stone-200'
-              }`}
-            >
-              Daily Schedule
-            </button>
-            <button
-              type="button"
-              onClick={() => onViewModeChange('week')}
-              className={`px-3 py-1.5 rounded-md transition-all cursor-pointer ${
-                viewMode === 'week'
-                  ? 'bg-white dark:bg-[#2e323c] text-stone-900 dark:text-stone-100 shadow-2xs font-semibold'
-                  : 'hover:text-stone-900 dark:hover:text-stone-200'
-              }`}
-            >
-              Week Flow
-            </button>
-            <button
-              type="button"
-              onClick={() => onViewModeChange('month')}
-              className={`px-3 py-1.5 rounded-md transition-all cursor-pointer ${
-                viewMode === 'month'
-                  ? 'bg-white dark:bg-[#2e323c] text-stone-900 dark:text-stone-100 shadow-2xs font-semibold'
-                  : 'hover:text-stone-900 dark:hover:text-stone-200'
-              }`}
-            >
-              Monthly Review
-            </button>
-            <button
-              type="button"
-              onClick={() => onViewModeChange('reflection')}
-              className={`px-3 py-1.5 rounded-md transition-all cursor-pointer ${
-                viewMode === 'reflection'
-                  ? 'bg-white dark:bg-[#2e323c] text-stone-900 dark:text-stone-100 shadow-2xs font-semibold'
-                  : 'hover:text-stone-900 dark:hover:text-stone-200'
-              }`}
-            >
-              Reflect & Summary
-            </button>
-          </div>
-
-          {/* The ONLY Add Button on the top right */}
-          <button
-            type="button"
-            onClick={onOpenAddModal}
-            className="inline-flex items-center gap-1 bg-stone-900 hover:bg-stone-800 dark:bg-stone-100 dark:hover:bg-white text-white dark:text-stone-900 text-xs font-semibold py-1.5 px-3 rounded-lg shadow-xs transition-colors cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Add</span>
-          </button>
         </div>
       </div>
 
@@ -467,25 +468,90 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
             Today
           </button>
 
-          <span className="text-sm font-semibold text-stone-900 dark:text-stone-100 tracking-tight ml-2">
+          <span className="text-sm font-semibold text-stone-900 dark:text-stone-100 tracking-tight ml-1 sm:ml-2">
             {navLabel}
           </span>
+
+          {/* 3-Position Partner Slider: to the right of the date using initials for both partners */}
+          <div className="flex items-center gap-1.5 bg-[#f5f1e8] dark:bg-[#202329] px-2 py-0.5 rounded-lg border border-[#e4ded5] dark:border-[#2d3139] text-xs shadow-2xs ml-1 sm:ml-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => onPartnerFilterChange(partnerFilter === 'her' ? 'all' : 'her')}
+              className={`w-5 h-5 flex items-center justify-center text-[11px] font-bold rounded-md transition-all cursor-pointer ${
+                partnerFilter === 'her'
+                  ? `${user1Theme.activeText} ${user1Theme.activeBg} ring-1 ring-stone-400/40 dark:ring-stone-500/40 shadow-xs`
+                  : `text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-200/60 dark:hover:bg-stone-700/60`
+              }`}
+              title={`Filter by ${partner1DisplayName} (click again for Both)`}
+              aria-label={`Filter by ${partner1DisplayName}`}
+            >
+              {partner1Initial}
+            </button>
+
+            {/* 3-Position Slider switch */}
+            <button
+              type="button"
+              role="switch"
+              aria-label={`Partner filter: ${partnerFilter === 'all' ? 'Both (Center)' : partnerFilter === 'her' ? partner1DisplayName : partner2DisplayName}`}
+              onClick={() => {
+                if (partnerFilter === 'her') onPartnerFilterChange('all');
+                else if (partnerFilter === 'all') onPartnerFilterChange('him');
+                else onPartnerFilterChange('her');
+              }}
+              className={`relative inline-flex h-5 w-12 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${
+                partnerFilter === 'her'
+                  ? user1Theme.sliderTrack
+                  : partnerFilter === 'him'
+                  ? user2Theme.sliderTrack
+                  : 'bg-stone-300 dark:bg-stone-600 ring-1 ring-stone-400/50 dark:ring-stone-500/50'
+              }`}
+              title={`Current: ${partnerFilter === 'all' ? 'Both (Center)' : partnerFilter === 'her' ? partner1DisplayName : partner2DisplayName} (Click to cycle)`}
+            >
+              <span
+                aria-hidden="true"
+                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out mt-0.5 ${
+                  partnerFilter === 'her'
+                    ? 'translate-x-0.5'
+                    : partnerFilter === 'him'
+                    ? 'translate-x-[30px]'
+                    : 'translate-x-[16px] ring-1 ring-stone-400/50'
+                }`}
+              />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onPartnerFilterChange(partnerFilter === 'him' ? 'all' : 'him')}
+              className={`w-5 h-5 flex items-center justify-center text-[11px] font-bold rounded-md transition-all cursor-pointer ${
+                partnerFilter === 'him'
+                  ? `${user2Theme.activeText} ${user2Theme.activeBg} ring-1 ring-stone-400/40 dark:ring-stone-500/40 shadow-xs`
+                  : `text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-200/60 dark:hover:bg-stone-700/60`
+              }`}
+              title={`Filter by ${partner2DisplayName} (click again for Both)`}
+              aria-label={`Filter by ${partner2DisplayName}`}
+            >
+              {partner2Initial}
+            </button>
+          </div>
         </div>
 
-        {/* Filter controls: Category Background Matching + Sort Dropdown + Hers/His View Filter Slider */}
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
-          {/* Categories with Background Colors Matching per user instruction */}
-          <div className="flex items-center gap-1.5">
+        {/* Filter controls: Compact Icon-Only Category Chip Bar + Sort Dropdown */}
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5 max-w-full">
+          {/* Categories: Compact Icon-Only Chip Bar with Tooltips */}
+          <div className="flex items-center gap-1 shrink-0" role="toolbar" aria-label="Category filters">
+            {/* "All" Category Icon Chip */}
             <button
               type="button"
               onClick={() => onCategoryFilterChange('all')}
-              className={`text-xs px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
+              title="All Categories"
+              aria-label="All Categories"
+              className={`p-1.5 rounded-lg text-xs transition-all cursor-pointer flex items-center justify-center shrink-0 ${
                 categoryFilter === 'all'
-                  ? 'bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 font-semibold'
-                  : 'bg-stone-100 dark:bg-[#252830] text-stone-600 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-[#2e323c]'
+                  ? 'bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 font-semibold shadow-2xs'
+                  : 'bg-stone-100 dark:bg-[#252830] text-stone-600 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-[#2e323c] border border-stone-200/80 dark:border-[#353943]'
               }`}
             >
-              All
+              <Layers className="w-3.5 h-3.5" />
             </button>
 
             {categoryKeys.map((key) => {
@@ -496,14 +562,14 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
                   key={key}
                   type="button"
                   onClick={() => onCategoryFilterChange(key)}
-                  title={`${meta.shortLabel} (${meta.label})`}
-                  className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md transition-all cursor-pointer ${getCategoryButtonClasses(
+                  title={meta.label}
+                  aria-label={meta.label}
+                  className={`p-1.5 rounded-lg text-xs transition-all cursor-pointer flex items-center justify-center shrink-0 ${getCategoryButtonClasses(
                     key,
                     isSelected
                   )}`}
                 >
                   {getCategoryIcon(key)}
-                  <span>{meta.shortLabel}</span>
                 </button>
               );
             })}
@@ -553,107 +619,6 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
                 <ArrowDown className="w-3.5 h-3.5" />
               )}
             </button>
-          </div>
-
-          {/* Dynamic Partner Slider View Filter placed to the right of Sort */}
-          <div className="flex items-center gap-1.5 border-l border-[#e2ddd5] dark:border-[#353943] pl-2 shrink-0">
-            <div className="flex items-center gap-1.5 bg-[#f5f1e8] dark:bg-[#202329] px-2.5 py-1 rounded-lg border border-[#e4ded5] dark:border-[#2d3139] text-xs shadow-2xs">
-              <button
-                type="button"
-                onClick={() => onPartnerFilterChange(partnerFilter === 'her' ? 'all' : 'her')}
-                className={`text-[11px] font-semibold transition-colors cursor-pointer px-1.5 py-0.5 rounded ${
-                  partnerFilter === 'her'
-                    ? `${user1Theme.activeText} ${user1Theme.activeBg}`
-                    : `text-stone-500 dark:text-stone-400 ${user1Theme.hoverText}`
-                }`}
-                title={`Filter by ${partner1Label}`}
-              >
-                {partner1Label}
-              </button>
-
-              {/* Slider switch */}
-              <button
-                type="button"
-                role="switch"
-                aria-label="Toggle partner filter"
-                onClick={() => {
-                  if (!partnerUser && onOpenInviteModal) {
-                    if (partnerFilter === 'all') onPartnerFilterChange('her');
-                    else if (partnerFilter === 'her') onOpenInviteModal();
-                    else onPartnerFilterChange('all');
-                  } else {
-                    if (partnerFilter === 'all') onPartnerFilterChange('her');
-                    else if (partnerFilter === 'her') onPartnerFilterChange('him');
-                    else onPartnerFilterChange('all');
-                  }
-                }}
-                className={`relative inline-flex h-5 w-11 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${
-                  partnerFilter === 'her'
-                    ? user1Theme.sliderTrack
-                    : partnerFilter === 'him'
-                    ? user2Theme.sliderTrack
-                    : 'bg-stone-300 dark:bg-stone-600'
-                }`}
-                title={`Current: ${partnerFilter === 'all' ? 'Both of Us' : partnerFilter === 'her' ? partner1Label : partner2Label} (Click to cycle)`}
-              >
-                <span
-                  aria-hidden="true"
-                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out mt-0.5 ${
-                    partnerFilter === 'her'
-                      ? 'translate-x-0.5'
-                      : partnerFilter === 'him'
-                      ? 'translate-x-6'
-                      : 'translate-x-3.25'
-                  }`}
-                />
-              </button>
-
-              {/* Partner 2: If partner joined, shows partner label. If NOT, shows + Invite Partner button! */}
-              {partnerUser ? (
-                <button
-                  type="button"
-                  onClick={() => onPartnerFilterChange(partnerFilter === 'him' ? 'all' : 'him')}
-                  className={`text-[11px] font-semibold transition-colors cursor-pointer px-1.5 py-0.5 rounded ${
-                    partnerFilter === 'him'
-                      ? `${user2Theme.activeText} ${user2Theme.activeBg}`
-                      : `text-stone-500 dark:text-stone-400 ${user2Theme.hoverText}`
-                  }`}
-                  title={`Filter by ${partner2Label}`}
-                >
-                  {partner2Label}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (onOpenInviteModal) onOpenInviteModal();
-                  }}
-                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-700 dark:text-purple-300 hover:text-purple-900 bg-purple-100/90 dark:bg-purple-950/70 hover:bg-purple-200 dark:hover:bg-purple-900/80 px-2 py-0.5 rounded-md border border-purple-300 dark:border-purple-800 transition-all cursor-pointer shadow-2xs"
-                  title={`Click to invite partner with code ${currentHub?.inviteCode || ''}`}
-                >
-                  <Plus className="w-3 h-3 text-purple-600 dark:text-purple-400" />
-                  <span>Invite</span>
-                  {currentHub?.inviteCode && (
-                    <span className="font-mono text-[9px] px-1 py-0.2 rounded bg-purple-200 dark:bg-purple-900 text-purple-900 dark:text-purple-200 font-bold ml-0.5">
-                      {currentHub.inviteCode}
-                    </span>
-                  )}
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={() => onPartnerFilterChange('all')}
-                className={`text-[10px] font-semibold px-1.5 py-0.5 rounded transition-colors cursor-pointer ${
-                  partnerFilter === 'all'
-                    ? 'bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 shadow-2xs'
-                    : 'text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200'
-                }`}
-                title="Show both partners"
-              >
-                Both
-              </button>
-            </div>
           </div>
         </div>
 
