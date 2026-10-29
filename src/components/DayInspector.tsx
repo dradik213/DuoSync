@@ -73,9 +73,25 @@ export const DayInspector: React.FC<DayInspectorProps> = ({
   } = useAuth();
   const [showRolloverDrawer, setShowRolloverDrawer] = useState(false);
   const [dayNotes, setDayNotes] = useState(stayInfo?.notes || '');
+  const [expandedEventIds, setExpandedEventIds] = useState<Record<string, boolean>>({});
+  const [collapsedTaskSections, setCollapsedTaskSections] = useState<Record<string, boolean>>({});
   const [newTaskInputs, setNewTaskInputs] = useState<Record<string, string>>({});
   const [packoutEvent, setPackoutEvent] = useState<CalendarEvent | null>(null);
   const [posEvent, setPosEvent] = useState<CalendarEvent | null>(null);
+
+  const toggleEventExpanded = (eventId: string) => {
+    setExpandedEventIds((prev) => ({
+      ...prev,
+      [eventId]: prev[eventId] === undefined ? false : !prev[eventId],
+    }));
+  };
+
+  const toggleTaskSection = (eventId: string) => {
+    setCollapsedTaskSections((prev) => ({
+      ...prev,
+      [eventId]: !prev[eventId],
+    }));
+  };
 
   const handleSavePackout = (eventId: string, updatedInventory: MarketPackoutItem[]) => {
     const target = allEvents.find((e) => e.id === eventId);
@@ -448,6 +464,8 @@ export const DayInspector: React.FC<DayInspectorProps> = ({
                 // Formatted partner label
                 const partnerLabel = evt.assignedTo === 'her' ? partner1Label : evt.assignedTo === 'him' ? partner2Label : 'Both';
                 const eventEmoji = evt.emoji || cfg.emoji;
+                const isExpanded = expandedEventIds[evt.id] !== false; // default open
+                const isTasksCollapsed = collapsedTaskSections[evt.id] === true;
 
                 return (
                   <div
@@ -455,8 +473,11 @@ export const DayInspector: React.FC<DayInspectorProps> = ({
                     className={`p-3.5 rounded-xl border border-l-4 transition-all shadow-2xs space-y-2.5 ${cfg.badgeBg} ${cfg.borderColor}`}
                   >
                     {/* Event Header with category colors */}
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
+                    <div
+                      onClick={() => toggleEventExpanded(evt.id)}
+                      className="flex items-start justify-between gap-2 cursor-pointer select-none"
+                    >
+                      <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-sm shrink-0 leading-none">{eventEmoji}</span>
                           <h4 className={`text-sm font-bold truncate ${cfg.textColor}`}>
@@ -474,6 +495,20 @@ export const DayInspector: React.FC<DayInspectorProps> = ({
                           <span className="text-[10px] opacity-75 font-medium">
                             · {cfg.shortLabel}
                           </span>
+                          {tasks.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleTaskSection(evt.id);
+                              }}
+                              className="font-sans text-[10px] px-1.5 py-0.5 rounded bg-white/70 dark:bg-black/40 hover:bg-white dark:hover:bg-black/60 text-stone-700 dark:text-stone-300 font-mono inline-flex items-center gap-1 cursor-pointer transition-colors"
+                              title={isTasksCollapsed ? 'Expand checklist tasks' : 'Collapse checklist tasks'}
+                            >
+                              <span>{completedCount}/{tasks.length}</span>
+                              {isTasksCollapsed ? <ChevronDown className="w-2.5 h-2.5" /> : <ChevronUp className="w-2.5 h-2.5" />}
+                            </button>
+                          )}
                         </div>
 
                         {/* Event Time & Venue info */}
@@ -492,137 +527,179 @@ export const DayInspector: React.FC<DayInspectorProps> = ({
                         </div>
                       </div>
 
-                      {/* Delete Event Button */}
-                      {onDeleteEvent && (
+                      <div className="flex items-center gap-1 shrink-0">
+                        {onDeleteEvent && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteEvent(evt.id);
+                            }}
+                            className="text-stone-300 dark:text-stone-600 hover:text-rose-600 dark:hover:text-rose-400 transition-colors p-1 cursor-pointer"
+                            title="Remove event"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                         <button
                           type="button"
-                          onClick={() => onDeleteEvent(evt.id)}
-                          className="text-stone-300 dark:text-stone-600 hover:text-rose-600 dark:hover:text-rose-400 transition-colors p-1 cursor-pointer"
-                          title="Remove event"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleEventExpanded(evt.id);
+                          }}
+                          className="p-1 rounded text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 transition-colors cursor-pointer"
+                          title={isExpanded ? 'Collapse event details' : 'Expand event details'}
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                         </button>
-                      )}
+                      </div>
                     </div>
 
-                    {/* Multiline Event Notes with line breaks & bullets preserved */}
-                    {evt.notes && (
-                      <div className="text-xs text-stone-700 dark:text-stone-300 bg-[#f7f4ec] dark:bg-[#252830] p-2.5 rounded-lg border border-[#e8e3d8] dark:border-[#353943] whitespace-pre-wrap break-words leading-relaxed font-sans">
-                        {evt.notes}
-                      </div>
-                    )}
-
-                    {/* Pop-Up Market Details & Inventory/Register Actions */}
-                    {(evt.category === 'market' || evt.marketDetails) && (
-                      <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 p-2.5 space-y-2 text-xs font-mono">
-                        <div className="grid grid-cols-2 gap-2 text-[11px]">
-                          <div>
-                            <span className="text-[10px] text-amber-800 dark:text-amber-300 font-sans block">Booth Fee</span>
-                            <span className="font-bold text-stone-900 dark:text-stone-100">${evt.marketDetails?.boothFee || 0}</span>
+                    {isExpanded && (
+                      <>
+                        {/* Multiline Event Notes with line breaks & bullets preserved */}
+                        {evt.notes && (
+                          <div className="text-xs text-stone-700 dark:text-stone-300 bg-[#f7f4ec] dark:bg-[#252830] p-2.5 rounded-lg border border-[#e8e3d8] dark:border-[#353943] whitespace-pre-wrap break-words leading-relaxed font-sans">
+                            {evt.notes}
                           </div>
-                          <div>
-                            <span className="text-[10px] text-amber-800 dark:text-amber-300 font-sans block">Actual Sales</span>
-                            <span className="font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
-                              ${(evt.marketDetails?.actualRevenue || 0).toFixed(2)}
-                            </span>
-                          </div>
-                        </div>
+                        )}
 
-                        <div className="flex items-center justify-between gap-1.5 pt-1.5 border-t border-amber-200/80 dark:border-amber-900/40">
-                          <span className="text-[10px] text-amber-900 dark:text-amber-200 font-sans">
-                            {evt.marketDetails?.inventory?.length 
-                              ? `${evt.marketDetails.inventory.reduce((a, b) => a + b.quantityPacked, 0)} items packed` 
-                              : '0 items packed'}
-                          </span>
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => setPackoutEvent(evt)}
-                              className="px-2 py-1 rounded bg-white dark:bg-[#1a1d22] border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
-                            >
-                              <Barcode className="w-3 h-3 text-amber-700" />
-                              <span>Inventory</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setPosEvent(evt)}
-                              className="px-2.5 py-1 rounded bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
-                            >
-                              <ShoppingBag className="w-3 h-3" />
-                              <span>Register</span>
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Specific Event Individual Tasks Section */}
-                    <div className="pt-2 border-t border-[#f0ebe2] dark:border-[#2b2e36] space-y-2">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-[11px] font-semibold text-stone-600 dark:text-stone-400 uppercase tracking-wide">
-                          Checklist Tasks ({completedCount}/{tasks.length})
-                        </span>
-                        <span className="text-[10px] text-stone-400">
-                          Toggle slider for status
-                        </span>
-                      </div>
-
-                      {/* Individual Tasks List with Slider Switcher */}
-                      <div className="space-y-1.5">
-                        {tasks.map((task) => (
-                          <div
-                            key={task.id}
-                            className="p-2 rounded-lg bg-[#fbf9f5] dark:bg-[#252830] border border-[#e8e3d8] dark:border-[#333742] flex items-center justify-between gap-2.5 transition-colors"
-                          >
-                            <div className="flex items-center gap-2 min-w-0 flex-1">
-                              {/* The Slider on/off Switch */}
-                              <TaskToggleSlider
-                                checked={task.completed}
-                                onChange={(newChecked) => onToggleTask(evt.id, task.id, newChecked)}
-                                label={task.title}
-                              />
-                              <span
-                                className={`text-xs ${
-                                  task.completed
-                                    ? 'line-through text-stone-400 dark:text-stone-500'
-                                    : 'text-stone-800 dark:text-stone-200'
-                                } truncate`}
-                              >
-                                {task.title}
-                              </span>
+                        {/* Pop-Up Market Details & Inventory/Register Actions */}
+                        {(evt.category === 'market' || evt.marketDetails) && (
+                          <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 p-2.5 space-y-2 text-xs font-mono">
+                            <div className="grid grid-cols-2 gap-2 text-[11px]">
+                              <div>
+                                <span className="text-[10px] text-amber-800 dark:text-amber-300 font-sans block">Booth Fee</span>
+                                <span className="font-bold text-stone-900 dark:text-stone-100">${evt.marketDetails?.boothFee || 0}</span>
+                              </div>
+                              <div>
+                                <span className="text-[10px] text-amber-800 dark:text-amber-300 font-sans block">Actual Sales</span>
+                                <span className="font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                                  ${(evt.marketDetails?.actualRevenue || 0).toFixed(2)}
+                                </span>
+                              </div>
                             </div>
 
-                            <button
-                              type="button"
-                              onClick={() => onDeleteTaskFromEvent(evt.id, task.id)}
-                              className="text-stone-300 dark:text-stone-600 hover:text-rose-500 transition-colors p-0.5 shrink-0 cursor-pointer"
-                              title="Delete task"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
+                            <div className="flex items-center justify-between gap-1.5 pt-1.5 border-t border-amber-200/80 dark:border-amber-900/40">
+                              <span className="text-[10px] text-amber-900 dark:text-amber-200 font-sans">
+                                {evt.marketDetails?.inventory?.length 
+                                  ? `${evt.marketDetails.inventory.reduce((a, b) => a + b.quantityPacked, 0)} items packed` 
+                                  : '0 items packed'}
+                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => setPackoutEvent(evt)}
+                                  className="px-2 py-1 rounded bg-white dark:bg-[#1a1d22] border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
+                                >
+                                  <Barcode className="w-3 h-3 text-amber-700" />
+                                  <span>Inventory</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setPosEvent(evt)}
+                                  className="px-2.5 py-1 rounded bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
+                                >
+                                  <ShoppingBag className="w-3 h-3" />
+                                  <span>Register</span>
+                                </button>
+                              </div>
+                            </div>
                           </div>
-                        ))}
-                      </div>
+                        )}
 
-                      {/* Add Individual Task Text Box Entry Form (Press Enter to add, no extra add button) */}
-                      <div className="pt-1">
-                        <input
-                          type="text"
-                          placeholder="Type task & press Enter to add..."
-                          value={newTaskInputs[evt.id] || ''}
-                          onChange={(e) =>
-                            setNewTaskInputs((prev) => ({ ...prev, [evt.id]: e.target.value }))
-                          }
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              handleCreateTask(evt.id);
-                            }
-                          }}
-                          className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-[#e4ded5] dark:border-[#353943] bg-white dark:bg-[#1a1d22] text-stone-800 dark:text-stone-200 focus:outline-none focus:ring-1 focus:ring-stone-900 dark:focus:ring-stone-100 placeholder:text-stone-400"
-                        />
-                      </div>
-                    </div>
+                        {/* Specific Event Individual Tasks Section */}
+                        <div className="pt-2 border-t border-[#f0ebe2] dark:border-[#2b2e36] space-y-2">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleTaskSection(evt.id);
+                            }}
+                            className="w-full flex items-center justify-between text-xs cursor-pointer select-none group text-left"
+                            title={isTasksCollapsed ? 'Expand checklist tasks' : 'Collapse checklist tasks'}
+                          >
+                            <span className="text-[11px] font-semibold text-stone-600 dark:text-stone-400 uppercase tracking-wide flex items-center gap-1.5 group-hover:text-stone-900 dark:group-hover:text-stone-200 transition-colors">
+                              <span>Checklist Tasks ({completedCount}/{tasks.length})</span>
+                              {isTasksCollapsed ? (
+                                <ChevronDown className="w-3 h-3 text-stone-400 group-hover:text-stone-600 transition-colors" />
+                              ) : (
+                                <ChevronUp className="w-3 h-3 text-stone-400 group-hover:text-stone-600 transition-colors" />
+                              )}
+                            </span>
+                            <span className="text-[10px] text-stone-400">
+                              {isTasksCollapsed ? 'Click to show tasks' : 'Toggle slider for status'}
+                            </span>
+                          </button>
+
+                          {!isTasksCollapsed && (
+                            <>
+                              {/* Individual Tasks List with Slider Switcher */}
+                              {tasks.length > 0 ? (
+                                <div className="space-y-1.5">
+                                  {tasks.map((task) => (
+                                    <div
+                                      key={task.id}
+                                      className="p-2 rounded-lg bg-[#fbf9f5] dark:bg-[#252830] border border-[#e8e3d8] dark:border-[#333742] flex items-center justify-between gap-2.5 transition-colors"
+                                    >
+                                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                                        {/* The Slider on/off Switch */}
+                                        <TaskToggleSlider
+                                          checked={task.completed}
+                                          onChange={(newChecked) => onToggleTask(evt.id, task.id, newChecked)}
+                                          label={task.title}
+                                        />
+                                        <span
+                                          className={`text-xs ${
+                                            task.completed
+                                              ? 'line-through text-stone-400 dark:text-stone-500'
+                                              : 'text-stone-800 dark:text-stone-200'
+                                          } truncate`}
+                                        >
+                                          {task.title}
+                                        </span>
+                                      </div>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => onDeleteTaskFromEvent(evt.id, task.id)}
+                                        className="text-stone-300 dark:text-stone-600 hover:text-rose-500 transition-colors p-0.5 shrink-0 cursor-pointer"
+                                        title="Delete task"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-[11px] text-stone-400 italic py-1">
+                                  No tasks created yet for this activity.
+                                </p>
+                              )}
+
+                              {/* Add Individual Task Text Box Entry Form */}
+                              <div className="pt-1">
+                                <input
+                                  type="text"
+                                  placeholder="Type task & press Enter to add..."
+                                  value={newTaskInputs[evt.id] || ''}
+                                  onChange={(e) =>
+                                    setNewTaskInputs((prev) => ({ ...prev, [evt.id]: e.target.value }))
+                                  }
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      handleCreateTask(evt.id);
+                                    }
+                                  }}
+                                  className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-[#e4ded5] dark:border-[#353943] bg-white dark:bg-[#1a1d22] text-stone-800 dark:text-stone-200 focus:outline-none focus:ring-1 focus:ring-stone-900 dark:focus:ring-stone-100 placeholder:text-stone-400"
+                                />
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
                 );
               })}

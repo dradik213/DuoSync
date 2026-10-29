@@ -893,6 +893,7 @@ function CalendarApp() {
                   stays={stays}
                   selectedDate={selectedDate}
                   onSelectDate={handleSelectDate}
+                  onToggleTask={handleToggleTask}
                   categoryFilter={categoryFilter}
                   partnerFilter={partnerFilter}
                   sortOption={sortOption}
@@ -907,6 +908,7 @@ function CalendarApp() {
                   stays={stays}
                   selectedDate={selectedDate}
                   onSelectDate={handleSelectDate}
+                  onToggleTask={handleToggleTask}
                   categoryFilter={categoryFilter}
                   partnerFilter={partnerFilter}
                   sortOption={sortOption}

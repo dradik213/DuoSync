@@ -1,5 +1,5 @@
-import React from 'react';
-import { Home } from 'lucide-react';
+import React, { useState } from 'react';
+import { Home, ChevronDown, ChevronUp, Check } from 'lucide-react';
 import { CalendarEvent, DayStayInfo, EventCategory, EventSortOption, SortDirection } from '../types/calendar';
 import { CATEGORY_CONFIG, formatDateToYMD, sortEventsForDay, formatTimeRange, formatUsTime, matchesPartnerFilter, eventOccursOnDate } from '../utils/calendarUtils';
 import { getMoonPhase } from '../utils/astronomyUtils';
@@ -11,6 +11,7 @@ interface WeekViewProps {
   stays: Record<string, DayStayInfo>;
   selectedDate: string;
   onSelectDate: (dateStr: string) => void;
+  onToggleTask?: (eventId: string, taskId: string, completed: boolean) => void;
   categoryFilter: EventCategory | 'all';
   partnerFilter: 'all' | 'her' | 'him';
   sortOption?: EventSortOption;
@@ -23,12 +24,29 @@ export const WeekView: React.FC<WeekViewProps> = ({
   stays,
   selectedDate,
   onSelectDate,
+  onToggleTask,
   categoryFilter,
   partnerFilter,
   sortOption = 'time',
   sortDirection = 'none',
 }) => {
   const { partner1Label, partner2Label, user1Theme, user2Theme } = useAuth();
+  const [collapsedEventIds, setCollapsedEventIds] = useState<Record<string, boolean>>({});
+  const [expandedTaskIds, setExpandedTaskIds] = useState<Record<string, boolean>>({});
+
+  const toggleEvent = (eventId: string) => {
+    setCollapsedEventIds((prev) => ({
+      ...prev,
+      [eventId]: !prev[eventId],
+    }));
+  };
+
+  const toggleTasks = (eventId: string) => {
+    setExpandedTaskIds((prev) => ({
+      ...prev,
+      [eventId]: !prev[eventId],
+    }));
+  };
   const curr = new Date(currentDate);
   const dayOfWeek = (curr.getDay() + 6) % 7;
   const monday = new Date(curr);
@@ -143,26 +161,97 @@ export const WeekView: React.FC<WeekViewProps> = ({
                     const cfg = CATEGORY_CONFIG[evt.category];
                     const tasks = evt.tasks || [];
                     const completedCount = tasks.filter((t) => t.completed).length;
+                    const isEventCollapsed = collapsedEventIds[evt.id] === true;
+                    const isTasksExpanded = expandedTaskIds[evt.id] === true;
 
                     return (
                       <div
                         key={evt.id}
                         className={`p-2 rounded-lg border text-xs ${cfg.badgeBg} ${cfg.borderColor} shadow-2xs`}
                       >
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs leading-none shrink-0">{evt.emoji || cfg.emoji}</span>
-                          <span className={`font-semibold truncate leading-tight ${cfg.textColor}`}>
-                            {evt.title}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between text-[10px] text-stone-500 dark:text-stone-400 mt-1 font-mono">
-                          {evt.startTime && <span>{formatTimeRange(evt.startTime, evt.endTime)}</span>}
-                          {tasks.length > 0 && (
-                            <span className="font-sans text-[9px] ml-auto">
-                              {completedCount}/{tasks.length}
+                        <div className="flex items-center justify-between gap-1 leading-tight">
+                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                            <span className="text-xs leading-none shrink-0">{evt.emoji || cfg.emoji}</span>
+                            <span className={`font-semibold truncate leading-tight ${cfg.textColor}`}>
+                              {evt.title}
                             </span>
-                          )}
+                          </div>
+
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            {tasks.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleTasks(evt.id);
+                                }}
+                                className="font-sans text-[9px] px-1.5 py-0.2 rounded bg-white/70 dark:bg-black/40 hover:bg-white dark:hover:bg-black/60 text-stone-700 dark:text-stone-300 font-mono inline-flex items-center gap-0.5 cursor-pointer transition-colors"
+                                title={isTasksExpanded ? 'Collapse checklist tasks' : 'Expand checklist tasks'}
+                              >
+                                <span>{completedCount}/{tasks.length}</span>
+                                {isTasksExpanded ? <ChevronUp className="w-2 h-2" /> : <ChevronDown className="w-2 h-2" />}
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleEvent(evt.id);
+                              }}
+                              className="p-0.5 rounded text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 cursor-pointer transition-colors"
+                              title={isEventCollapsed ? 'Expand event details' : 'Collapse event details'}
+                            >
+                              {isEventCollapsed ? <ChevronDown className="w-2.5 h-2.5" /> : <ChevronUp className="w-2.5 h-2.5" />}
+                            </button>
+                          </div>
                         </div>
+
+                        {/* Secondary details row (when not collapsed) */}
+                        {!isEventCollapsed && (
+                          <div className="mt-1 space-y-0.5 pt-1 border-t border-black/5 dark:border-white/10">
+                            <div className="flex items-center justify-between text-[10px] text-stone-500 dark:text-stone-400 font-mono">
+                              {evt.startTime && <span>{formatTimeRange(evt.startTime, evt.endTime)}</span>}
+                            </div>
+                            {evt.locationName && (
+                              <div className="text-[10px] text-stone-600 dark:text-stone-400 truncate font-sans">
+                                {evt.locationName}
+                              </div>
+                            )}
+                            {evt.notes && (
+                              <div className="text-[9.5px] text-stone-500 dark:text-stone-400 truncate font-sans italic">
+                                {evt.notes}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Independent Checklist Tasks Expansion */}
+                        {isTasksExpanded && tasks.length > 0 && (
+                          <div className="mt-1.5 pt-1 border-t border-black/10 dark:border-white/10 space-y-1">
+                            {tasks.map((task) => (
+                              <div
+                                key={task.id}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (onToggleTask) {
+                                    onToggleTask(evt.id, task.id, !task.completed);
+                                  }
+                                }}
+                                className="flex items-center gap-1.5 text-[10px] cursor-pointer hover:opacity-80 select-none py-0.5"
+                                title={onToggleTask ? 'Click to toggle completion' : task.title}
+                              >
+                                <span className={`w-3 h-3 rounded-xs border flex items-center justify-center shrink-0 ${
+                                  task.completed ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-stone-400 dark:border-stone-500 bg-white dark:bg-black/40'
+                                }`}>
+                                  {task.completed && <Check className="w-2 h-2 stroke-[3]" />}
+                                </span>
+                                <span className={`truncate text-[10px] ${task.completed ? 'line-through opacity-60 text-stone-500' : 'text-stone-800 dark:text-stone-200'}`}>
+                                  {task.title}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     );
                   })}

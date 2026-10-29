@@ -93,6 +93,7 @@ export const InteractiveDaySchedule: React.FC<InteractiveDayScheduleProps> = ({
     user2Theme 
   } = useAuth();
   const [expandedEventIds, setExpandedEventIds] = useState<Record<string, boolean>>({});
+  const [collapsedTaskSections, setCollapsedTaskSections] = useState<Record<string, boolean>>({});
   const [dayNotes, setDayNotes] = useState(stays[selectedDate]?.notes || '');
   const [newTaskInputs, setNewTaskInputs] = useState<Record<string, string>>({});
   const [newTaskAssignees, setNewTaskAssignees] = useState<Record<string, 'both' | 'him' | 'her'>>({});
@@ -247,6 +248,13 @@ export const InteractiveDaySchedule: React.FC<InteractiveDayScheduleProps> = ({
 
   const toggleEventExpanded = (id: string) => {
     setExpandedEventIds((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const toggleTaskSection = (eventId: string) => {
+    setCollapsedTaskSections((prev) => ({
+      ...prev,
+      [eventId]: !prev[eventId],
+    }));
   };
 
   const handleNotesChange = (val: string) => {
@@ -617,7 +625,7 @@ export const InteractiveDaySchedule: React.FC<InteractiveDayScheduleProps> = ({
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-base leading-none shrink-0">{evt.emoji || cfg.emoji}</span>
-                      <h3 className={`text-base font-bold ${cfg.textColor} ${allTasksDone ? 'line-through opacity-70' : ''}`}>
+                      <h3 className={`text-base font-bold ${cfg.textColor}`}>
                         {evt.title}
                       </h3>
                       <span className={`text-[11px] font-semibold px-2 py-0.5 rounded border ${
@@ -649,10 +657,23 @@ export const InteractiveDaySchedule: React.FC<InteractiveDayScheduleProps> = ({
                         </span>
                       )}
                       {tasks.length > 0 && (
-                        <span className="inline-flex items-center gap-1 font-mono text-[11px] font-semibold bg-white/70 dark:bg-black/40 px-2 py-0.5 rounded border border-black/5 dark:border-white/10">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleTaskSection(evt.id);
+                          }}
+                          className="inline-flex items-center gap-1 font-mono text-[11px] font-semibold bg-white/70 dark:bg-black/40 hover:bg-white dark:hover:bg-black/60 px-2 py-0.5 rounded border border-black/5 dark:border-white/10 cursor-pointer transition-colors"
+                          title={collapsedTaskSections[evt.id] ? "Expand checklist tasks" : "Collapse checklist tasks"}
+                        >
                           <CheckCircle2 className={`w-3.5 h-3.5 ${allTasksDone ? 'text-emerald-600' : 'text-stone-500'}`} />
-                          {completedCount} of {tasks.length} tasks done
-                        </span>
+                          <span>{completedCount} of {tasks.length} tasks done</span>
+                          {collapsedTaskSections[evt.id] ? (
+                            <ChevronDown className="w-3 h-3 text-stone-500" />
+                          ) : (
+                            <ChevronUp className="w-3 h-3 text-stone-500" />
+                          )}
+                        </button>
                       )}
                     </div>
                   </div>
@@ -763,84 +784,101 @@ export const InteractiveDaySchedule: React.FC<InteractiveDayScheduleProps> = ({
 
                     {/* Individual Tasks Checklist - Working through the day */}
                     <div className="space-y-2">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-bold uppercase tracking-wider text-stone-800 dark:text-stone-200 font-mono text-[11px] flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleTaskSection(evt.id);
+                        }}
+                        className="w-full flex items-center justify-between text-xs cursor-pointer select-none group text-left"
+                        title={collapsedTaskSections[evt.id] ? 'Expand checklist tasks' : 'Collapse checklist tasks'}
+                      >
+                        <span className="font-bold uppercase tracking-wider text-stone-800 dark:text-stone-200 font-mono text-[11px] flex items-center gap-1.5 group-hover:text-stone-900 dark:group-hover:text-stone-100 transition-colors">
                           <CheckCircle2 className="w-3.5 h-3.5 text-stone-500" />
                           <span>Checklist Tasks ({completedCount}/{tasks.length})</span>
+                          {collapsedTaskSections[evt.id] ? (
+                            <ChevronDown className="w-3.5 h-3.5 text-stone-400 group-hover:text-stone-600 transition-colors" />
+                          ) : (
+                            <ChevronUp className="w-3.5 h-3.5 text-stone-400 group-hover:text-stone-600 transition-colors" />
+                          )}
                         </span>
                         <span className="text-[10px] text-stone-500 dark:text-stone-400">
-                          Toggle slider as completed
+                          {collapsedTaskSections[evt.id] ? 'Click to show tasks' : 'Toggle slider as completed'}
                         </span>
-                      </div>
+                      </button>
 
-                      {tasks.length > 0 ? (
-                        <div className="space-y-1.5">
-                          {tasks.map((task) => (
-                            <div
-                              key={task.id}
-                              className={`p-2.5 rounded-lg border flex items-center justify-between gap-3 transition-colors ${
-                                task.completed
-                                  ? 'bg-stone-100/70 dark:bg-[#1f2229] border-stone-200 dark:border-stone-800 text-stone-400'
-                                  : 'bg-stone-50 dark:bg-[#22252c] border-stone-200/80 dark:border-stone-700/60 text-stone-800 dark:text-stone-200'
-                              }`}
-                            >
-                              <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                                {/* The on/off slider switch */}
-                                <TaskToggleSlider
-                                  checked={task.completed}
-                                  onChange={(newChecked) => onToggleTask(evt.id, task.id, newChecked)}
-                                  label={task.title}
-                                />
-                                <span className={`text-xs ${task.completed ? 'line-through text-stone-400 dark:text-stone-500' : 'text-stone-800 dark:text-stone-200 font-medium'} truncate`}>
-                                  {task.title}
-                                </span>
-                              </div>
-
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <button
-                                  type="button"
-                                  onClick={() => onDeleteTaskFromEvent(evt.id, task.id)}
-                                  className="text-stone-300 hover:text-rose-500 p-1 cursor-pointer transition-colors"
-                                  title="Delete task"
+                      {!collapsedTaskSections[evt.id] && (
+                        <>
+                          {tasks.length > 0 ? (
+                            <div className="space-y-1.5">
+                              {tasks.map((task) => (
+                                <div
+                                  key={task.id}
+                                  className={`p-2.5 rounded-lg border flex items-center justify-between gap-3 transition-colors ${
+                                    task.completed
+                                      ? 'bg-stone-100/70 dark:bg-[#1f2229] border-stone-200 dark:border-stone-800 text-stone-400'
+                                      : 'bg-stone-50 dark:bg-[#22252c] border-stone-200/80 dark:border-stone-700/60 text-stone-800 dark:text-stone-200'
+                                  }`}
                                 >
-                                  <X className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-[11px] text-stone-400 italic py-1">
-                          No tasks created yet for this activity.
-                        </p>
-                      )}
+                                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                    {/* The on/off slider switch */}
+                                    <TaskToggleSlider
+                                      checked={task.completed}
+                                      onChange={(newChecked) => onToggleTask(evt.id, task.id, newChecked)}
+                                      label={task.title}
+                                    />
+                                    <span className={`text-xs ${task.completed ? 'line-through text-stone-400 dark:text-stone-500' : 'text-stone-800 dark:text-stone-200 font-medium'} truncate`}>
+                                      {task.title}
+                                    </span>
+                                  </div>
 
-                      {/* Add individual task entry form */}
-                      <div className="pt-1 flex items-center gap-1.5">
-                        <input
-                          type="text"
-                          placeholder="Add new checklist task & press Enter..."
-                          value={newTaskInputs[evt.id] || ''}
-                          onChange={(e) =>
-                            setNewTaskInputs((prev) => ({ ...prev, [evt.id]: e.target.value }))
-                          }
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              handleCreateTask(evt.id);
-                            }
-                          }}
-                          className="flex-1 text-xs px-3 py-2 rounded-lg border border-[#e4ded5] dark:border-[#353943] bg-white dark:bg-[#1a1d22] text-stone-800 dark:text-stone-200 focus:outline-none focus:ring-1 focus:ring-stone-900"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleCreateTask(evt.id)}
-                          disabled={!newTaskInputs[evt.id]?.trim()}
-                          className="bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-stone-800 dark:hover:bg-white disabled:opacity-40 transition-colors cursor-pointer"
-                        >
-                          + Add
-                        </button>
-                      </div>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <button
+                                      type="button"
+                                      onClick={() => onDeleteTaskFromEvent(evt.id, task.id)}
+                                      className="text-stone-300 hover:text-rose-500 p-1 cursor-pointer transition-colors"
+                                      title="Delete task"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-[11px] text-stone-400 italic py-1">
+                              No tasks created yet for this activity.
+                            </p>
+                          )}
+
+                          {/* Add individual task entry form */}
+                          <div className="pt-1 flex items-center gap-1.5">
+                            <input
+                              type="text"
+                              placeholder="Add new checklist task & press Enter..."
+                              value={newTaskInputs[evt.id] || ''}
+                              onChange={(e) =>
+                                setNewTaskInputs((prev) => ({ ...prev, [evt.id]: e.target.value }))
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleCreateTask(evt.id);
+                                }
+                              }}
+                              className="flex-1 text-xs px-3 py-2 rounded-lg border border-[#e4ded5] dark:border-[#353943] bg-white dark:bg-[#1a1d22] text-stone-800 dark:text-stone-200 focus:outline-none focus:ring-1 focus:ring-stone-900"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleCreateTask(evt.id)}
+                              disabled={!newTaskInputs[evt.id]?.trim()}
+                              className="bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-stone-800 dark:hover:bg-white disabled:opacity-40 transition-colors cursor-pointer"
+                            >
+                              + Add
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
 
                     {/* Bottom Action Row: Edit details and remove */}

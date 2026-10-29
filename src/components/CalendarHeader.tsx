@@ -474,6 +474,7 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
 
           {/* 3-Position Partner Slider: to the right of the date using initials for both partners */}
           <div className="flex items-center gap-1.5 bg-[#f5f1e8] dark:bg-[#202329] px-2 py-0.5 rounded-lg border border-[#e4ded5] dark:border-[#2d3139] text-xs shadow-2xs ml-1 sm:ml-2 shrink-0">
+            <span className="text-[11px] font-medium text-stone-600 dark:text-stone-400">View:</span>
             <button
               type="button"
               onClick={() => onPartnerFilterChange(partnerFilter === 'her' ? 'all' : 'her')}
