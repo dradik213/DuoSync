@@ -105,9 +105,10 @@ export const InteractiveDaySchedule: React.FC<InteractiveDayScheduleProps> = ({
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
 
   // Sync day notes when selectedDate changes so notes don't stick across days
+  const currentStayNotes = stays[selectedDate]?.notes || '';
   useEffect(() => {
-    setDayNotes(stays[selectedDate]?.notes || '');
-  }, [selectedDate, stays]);
+    setDayNotes(currentStayNotes);
+  }, [selectedDate, currentStayNotes]);
 
   // Filter events for this specific day and sort using chosen sortOption (items without time after)
   const filteredDayEvents = events

@@ -79,7 +79,7 @@ Strictly output ONLY the JSON object, no Markdown code fences, no extra text.`;
     }
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.8-flash',
       contents: [
         {
           role: 'user',
@@ -154,7 +154,7 @@ Strictly return ONLY the JSON array.`;
     }
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.8-flash',
       contents: [
         {
           role: 'user',
@@ -190,7 +190,7 @@ app.post('/api/generate-insights', async (req, res) => {
     }
     const { timeframe, selectedDate, events, stays } = req.body;
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.8-flash',
       contents: [
         {
           role: 'user',

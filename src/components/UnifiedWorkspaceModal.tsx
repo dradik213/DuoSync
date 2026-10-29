@@ -419,10 +419,11 @@ export const UnifiedWorkspaceModal: React.FC<UnifiedWorkspaceModalProps> = ({
     }
   };
 
-  const generateGmailInsights = (msgs: GmailMessageSummary[]) => {
+  const generateGmailInsights = async (msgs: GmailMessageSummary[]) => {
     setIsAnalyzingEmails(true);
-    setTimeout(() => {
-      const simulatedInsights: GmailInsightItem[] = msgs.slice(0, 5).map((m, idx) => {
+
+    const fallbackParser = () => {
+      return msgs.slice(0, 5).map((m, idx) => {
         const sub = m.subject.toLowerCase();
         let cat: GmailInsightItem['category'] = 'reminder';
         let importance: GmailInsightItem['importance'] = 'medium';
@@ -450,16 +451,48 @@ export const UnifiedWorkspaceModal: React.FC<UnifiedWorkspaceModalProps> = ({
             title: m.subject.replace(/re:|fwd:/gi, '').trim(),
             startDate: selectedDate,
             startTime: '19:00',
-            category: cat === 'reservation' ? 'dinner_date' : 'other',
+            category: (cat === 'reservation' ? 'dinner_date' : 'other') as EventCategory,
             notes: `Extracted from email from ${m.from}. Snippet: ${m.snippet}`,
           },
           suggestedTask: `Follow up on email: "${m.subject}"`,
         };
       });
+    };
 
-      setGmailInsights(simulatedInsights);
+    try {
+      const emailSnippets = msgs.slice(0, 8).map((m) => ({
+        id: m.id,
+        subject: m.subject,
+        from: m.from,
+        date: m.date,
+        snippet: m.snippet,
+      }));
+
+      const res = await fetch('/api/gemini/analyze-emails', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          emailSnippets,
+          referenceDate: selectedDate,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Server returned non-ok status');
+      }
+
+      const parsed = await res.json();
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        setGmailInsights(parsed);
+      } else {
+        setGmailInsights(fallbackParser());
+      }
+    } catch (err) {
+      console.warn('Backend email analysis failed, using fallback parser:', err);
+      setGmailInsights(fallbackParser());
+    } finally {
       setIsAnalyzingEmails(false);
-    }, 600);
+    }
   };
 
   // AI Calendar Logger prompt execution
@@ -991,7 +1024,7 @@ export const UnifiedWorkspaceModal: React.FC<UnifiedWorkspaceModalProps> = ({
                   </p>
                 )}
                 {/* Active Hub Switcher: Calls AuthContext switchHub so App updates currentHub immediately */}
-                {hubs && hubs.length > 1 && (
+                {hubs && hubs.length > 0 && (
                   <div className="pt-2.5 border-t border-stone-200/70 dark:border-stone-800/70 flex items-center justify-between gap-3">
                     <span className="text-xs font-semibold text-stone-700 dark:text-stone-300">
                       Switch Active Hub:
@@ -1617,7 +1650,28 @@ export const UnifiedWorkspaceModal: React.FC<UnifiedWorkspaceModalProps> = ({
 
         {/* Modal Footer Bar */}
         <div className="px-6 py-3 border-t border-[#e5e0d8] dark:border-[#2d3139] bg-stone-50 dark:bg-[#1f2229] flex items-center justify-between text-xs text-stone-500">
-          <span>Active Hub: <strong>{currentHub?.name || 'Shared Life Hub'}</strong></span>
+          <div className="flex items-center gap-2">
+            <span>Active Hub:</span>
+            {hubs && hubs.length > 1 ? (
+              <select
+                value={currentHub?.id || ''}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    switchHub(e.target.value);
+                  }
+                }}
+                className="bg-transparent font-bold text-stone-900 dark:text-stone-100 border border-stone-300 dark:border-stone-700 rounded px-1.5 py-0.5 text-xs cursor-pointer"
+              >
+                {hubs.map((h) => (
+                  <option key={h.id} value={h.id} className="bg-white dark:bg-[#1a1d22]">
+                    {h.name} {h.id === currentHub?.id ? '(Active)' : ''}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <strong className="text-stone-800 dark:text-stone-200">{currentHub?.name || 'Shared Life Hub'}</strong>
+            )}
+          </div>
           <button
             type="button"
             onClick={onClose}

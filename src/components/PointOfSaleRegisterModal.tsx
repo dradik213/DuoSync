@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   X, 
   Barcode as BarcodeIcon, 
@@ -53,24 +53,33 @@ export const PointOfSaleRegisterModal: React.FC<PointOfSaleRegisterModalProps> =
   onClose,
   onCompleteSale
 }) => {
-  if (!isOpen) return null;
-
   const [masterInventory] = useState<InventoryProduct[]>(() => loadMasterInventory());
   
-  // Available items in booth: from packout or master catalog
-  const boothItems = (event.marketDetails?.inventory && event.marketDetails.inventory.length > 0)
-    ? event.marketDetails.inventory
-    : masterInventory.map((p) => ({
-        productId: p.id,
-        name: p.name,
-        barcode: p.barcode,
-        price: p.price,
-        category: p.category,
-        quantityPacked: p.defaultStock,
-        quantitySold: 0
-      }));
+  // Available items in booth: from packout or master catalog (memoized to prevent infinite render loops)
+  const boothItems = useMemo(() => {
+    return (event?.marketDetails?.inventory && event.marketDetails.inventory.length > 0)
+      ? event.marketDetails.inventory
+      : masterInventory.map((p) => ({
+          productId: p.id,
+          name: p.name,
+          barcode: p.barcode,
+          price: p.price,
+          category: p.category,
+          quantityPacked: p.defaultStock,
+          quantitySold: 0
+        }));
+  }, [event?.marketDetails?.inventory, masterInventory]);
 
   const [activeInventory, setActiveInventory] = useState<MarketPackoutItem[]>(boothItems);
+
+  useEffect(() => {
+    setActiveInventory(boothItems);
+  }, [boothItems]);
+
+  if (!isOpen) return null;
+
+  const [discountAmount, setDiscountAmount] = useState<number>(0);
+  const [discountPercent, setDiscountPercent] = useState<number>(0);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
@@ -222,14 +231,20 @@ export const PointOfSaleRegisterModal: React.FC<PointOfSaleRegisterModalProps> =
 
   const handleClearCart = () => {
     setCart([]);
+    setDiscountAmount(0);
+    setDiscountPercent(0);
   };
 
   // Calculations
   const cartSubtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
+  const activeDiscount = discountPercent > 0
+    ? (cartSubtotal * (discountPercent / 100))
+    : discountAmount;
+  const discountedSubtotal = Math.max(0, cartSubtotal - activeDiscount);
   const taxRate = 0.085; // 8.5% default sales tax
-  const taxAmount = cartSubtotal * taxRate;
-  const tipAmount = (cartSubtotal + taxAmount) * (tipPercent / 100);
-  const cartTotal = cartSubtotal + taxAmount + tipAmount;
+  const taxAmount = discountedSubtotal * taxRate;
+  const tipAmount = (discountedSubtotal + taxAmount) * (tipPercent / 100);
+  const cartTotal = discountedSubtotal + taxAmount + tipAmount;
 
   const currentRevenue = event.marketDetails?.actualRevenue || 0;
   const targetRevenue = event.marketDetails?.targetRevenue || 0;
@@ -259,7 +274,7 @@ export const PointOfSaleRegisterModal: React.FC<PointOfSaleRegisterModalProps> =
         quantity: c.quantity,
         unitPrice: c.price
       })),
-      subtotal: cartSubtotal,
+      subtotal: discountedSubtotal,
       tax: taxAmount,
       total: cartTotal,
       paymentMethod: method,
@@ -569,6 +584,48 @@ export const PointOfSaleRegisterModal: React.FC<PointOfSaleRegisterModalProps> =
                 <div className="flex items-center justify-between text-stone-500">
                   <span>Subtotal</span>
                   <span className="font-mono tabular-nums">${cartSubtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex items-center justify-between text-stone-500">
+                  <div className="flex items-center gap-1.5">
+                    <span>Discount</span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDiscountPercent(0);
+                          setDiscountAmount((prev) => (prev === 5 ? 0 : 5));
+                        }}
+                        className={`px-1.5 py-0.5 rounded text-[10px] font-mono border cursor-pointer ${
+                          discountAmount === 5 && discountPercent === 0
+                            ? 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-950 dark:text-purple-300 font-bold'
+                            : 'bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400 border-stone-200 dark:border-stone-700'
+                        }`}
+                      >
+                        -$5
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDiscountAmount(0);
+                          setDiscountPercent((prev) => (prev === 10 ? 0 : 10));
+                        }}
+                        className={`px-1.5 py-0.5 rounded text-[10px] font-mono border cursor-pointer ${
+                          discountPercent === 10
+                            ? 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-950 dark:text-purple-300 font-bold'
+                            : 'bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400 border-stone-200 dark:border-stone-700'
+                        }`}
+                      >
+                        10%
+                      </button>
+                    </div>
+                  </div>
+                  {activeDiscount > 0 ? (
+                    <span className="font-mono tabular-nums text-emerald-600 dark:text-emerald-400 font-semibold">
+                      -${activeDiscount.toFixed(2)}
+                    </span>
+                  ) : (
+                    <span className="font-mono tabular-nums text-stone-400">$0.00</span>
+                  )}
                 </div>
                 <div className="flex items-center justify-between text-stone-500">
                   <span>Sales Tax (8.5%)</span>

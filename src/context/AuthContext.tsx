@@ -48,6 +48,8 @@ interface AuthContextType {
   clearAllHubData: () => void;
   hubs: SharedHub[];
   switchHub: (hubId: string) => void;
+  setCurrentHub: (hub: SharedHub | string) => void;
+  setActiveHub: (hubId: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -576,8 +578,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (e) {}
   };
 
-  const switchHub = (hubId: string) => {
+  const switchHub = (hubOrId: SharedHub | string) => {
     if (!currentUser) return;
+    const hubId = typeof hubOrId === 'string' ? hubOrId : hubOrId.id;
     const targetHub = hubs.find((h) => h.id === hubId);
     if (!targetHub) return;
     const updatedUser: UserAccount = { ...currentUser, hubId: targetHub.id };
@@ -588,6 +591,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       } catch (e) {}
       return next;
     });
+    try {
+      saveUserToFirestore(updatedUser).catch(console.warn);
+    } catch (e) {}
   };
 
   return (
@@ -619,6 +625,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         clearAllHubData,
         hubs,
         switchHub,
+        setCurrentHub: switchHub,
+        setActiveHub: switchHub,
       }}
     >
       {children}

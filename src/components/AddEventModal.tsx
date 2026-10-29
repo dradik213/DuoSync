@@ -117,10 +117,10 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
           referenceDate: startDate,
         }),
       });
-      if (!res.ok) {
-        throw new Error('AI could not parse event');
-      }
       const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'AI could not parse event');
+      }
       if (data.title) setTitle(data.title);
       if (data.category) setCategory(data.category);
       if (data.emoji) setSelectedEmoji(data.emoji);

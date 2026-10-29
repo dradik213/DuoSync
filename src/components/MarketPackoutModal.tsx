@@ -33,8 +33,6 @@ export const MarketPackoutModal: React.FC<MarketPackoutModalProps> = ({
   onClose,
   onSavePackout
 }) => {
-  if (!isOpen) return null;
-
   const [masterInventory] = useState<InventoryProduct[]>(() => loadMasterInventory());
   const [packoutItems, setPackoutItems] = useState<MarketPackoutItem[]>(() => {
     if (event.marketDetails?.inventory && event.marketDetails.inventory.length > 0) {
@@ -229,6 +227,8 @@ export const MarketPackoutModal: React.FC<MarketPackoutModalProps> = ({
       p.barcode.includes(searchCatalogQuery);
     return !alreadyPacked && matchesSearch;
   });
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5">
