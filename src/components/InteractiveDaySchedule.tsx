@@ -121,116 +121,6 @@ export const InteractiveDaySchedule: React.FC<InteractiveDayScheduleProps> = ({
 
   const dayEvents = sortEventsForDay(filteredDayEvents, sortOption, sortDirection);
 
-  // Group overlapping events in the same time range into columns for side-by-side rendering
-  const eventClusters = React.useMemo(() => {
-    if (dayEvents.length === 0) return [];
-
-    const parseTimeToMinutes = (t?: string): number | null => {
-      if (!t) return null;
-      const [h, m] = t.split(':').map(Number);
-      if (isNaN(h) || isNaN(m)) return null;
-      return h * 60 + m;
-    };
-
-    const timedWithRange: Array<{
-      evt: CalendarEvent;
-      start: number;
-      end: number;
-    }> = [];
-    const untimed: CalendarEvent[] = [];
-
-    dayEvents.forEach((evt) => {
-      const s = parseTimeToMinutes(evt.startTime);
-      if (s !== null) {
-        let e = parseTimeToMinutes(evt.endTime);
-        if (e === null || e <= s) {
-          e = s + 60;
-        }
-        timedWithRange.push({ evt, start: s, end: e });
-      } else {
-        untimed.push(evt);
-      }
-    });
-
-    timedWithRange.sort((a, b) => a.start - b.start || (b.end - b.start) - (a.end - a.start));
-
-    const clusters: Array<Array<{ evt: CalendarEvent; start: number; end: number }>> = [];
-    let currentCluster: Array<{ evt: CalendarEvent; start: number; end: number }> = [];
-    let currentClusterEnd = -1;
-
-    timedWithRange.forEach((item) => {
-      if (currentCluster.length === 0) {
-        currentCluster.push(item);
-        currentClusterEnd = item.end;
-      } else if (item.start < currentClusterEnd) {
-        currentCluster.push(item);
-        currentClusterEnd = Math.max(currentClusterEnd, item.end);
-      } else {
-        clusters.push(currentCluster);
-        currentCluster = [item];
-        currentClusterEnd = item.end;
-      }
-    });
-    if (currentCluster.length > 0) {
-      clusters.push(currentCluster);
-    }
-
-    const result: Array<{
-      id: string;
-      items: Array<{
-        evt: CalendarEvent;
-        columnIndex: number;
-        totalColumns: number;
-      }>;
-    }> = [];
-
-    clusters.forEach((cluster, clusterIdx) => {
-      const colEndTimes: number[] = [];
-      const assignedItems: Array<{
-        evt: CalendarEvent;
-        columnIndex: number;
-        totalColumns: number;
-      }> = [];
-
-      cluster.forEach(({ evt, start, end }) => {
-        let col = 0;
-        while (col < colEndTimes.length && colEndTimes[col] > start) {
-          col++;
-        }
-        if (col < colEndTimes.length) {
-          colEndTimes[col] = end;
-        } else {
-          colEndTimes.push(end);
-        }
-        assignedItems.push({
-          evt,
-          columnIndex: col,
-          totalColumns: 1,
-        });
-      });
-
-      const totalCols = Math.max(1, colEndTimes.length);
-      const finalItems = assignedItems.map((item) => ({
-        ...item,
-        totalColumns: totalCols,
-      }));
-
-      result.push({
-        id: `cluster-timed-${clusterIdx}-${cluster[0].evt.id}`,
-        items: finalItems,
-      });
-    });
-
-    untimed.forEach((evt, uIdx) => {
-      result.push({
-        id: `cluster-untimed-${uIdx}-${evt.id}`,
-        items: [{ evt, columnIndex: 0, totalColumns: 1 }],
-      });
-    });
-
-    return result;
-  }, [dayEvents]);
-
   // Ensure first event is expanded by default on day change
   useEffect(() => {
     if (dayEvents.length > 0) {
@@ -590,36 +480,23 @@ export const InteractiveDaySchedule: React.FC<InteractiveDayScheduleProps> = ({
           )}
         </div>
       ) : (
-        <div className="space-y-3.5 relative">
-          {eventClusters.map((cluster) => {
-            const hasMultiple = cluster.items.length > 1;
+        <div className="space-y-3 relative w-full">
+          {dayEvents.map((evt) => {
+            const cfg = CATEGORY_CONFIG[evt.category];
+            const tasks = evt.tasks || [];
+            const completedCount = tasks.filter((t) => t.completed).length;
+            const isExpanded = expandedEventIds[evt.id] !== false; // default open
+            const partnerLabel = evt.assignedTo === 'her' ? partner1Label : evt.assignedTo === 'him' ? partner2Label : 'Both';
+            const allTasksDone = tasks.length > 0 && completedCount === tasks.length;
+
             return (
               <div
-                key={cluster.id}
-                className={hasMultiple ? 'relative w-full min-h-[140px]' : 'relative w-full'}
+                key={evt.id}
+                className={`w-full relative rounded-xl border transition-all shadow-xs overflow-hidden ${cfg.badgeBg} ${cfg.borderColor}`}
               >
-                {cluster.items.map(({ evt, columnIndex, totalColumns }) => {
-                  const cfg = CATEGORY_CONFIG[evt.category];
-                  const tasks = evt.tasks || [];
-                  const completedCount = tasks.filter((t) => t.completed).length;
-                  const isExpanded = expandedEventIds[evt.id] !== false; // default open
-                  const partnerLabel = evt.assignedTo === 'her' ? partner1Label : evt.assignedTo === 'him' ? partner2Label : 'Both';
-                  const allTasksDone = tasks.length > 0 && completedCount === tasks.length;
-
-                  return (
-                    <div
-                      key={evt.id}
-                      style={{
-                        width: `calc((100% - 4rem) / ${totalColumns})`,
-                        left: `calc(3.5rem + (${columnIndex} * (100% - 4rem) / ${totalColumns}))`,
-                      }}
-                      className={`rounded-xl border transition-all shadow-xs overflow-hidden ${cfg.badgeBg} ${cfg.borderColor} ${
-                        hasMultiple && columnIndex > 0 ? 'absolute top-0' : 'relative'
-                      }`}
-                    >
-                      {/* Event Card Header - Click to minimize / expand */}
-                      <div
-                        onClick={() => toggleEventExpanded(evt.id)}
+                {/* Event Card Header - Click to minimize / expand */}
+                <div
+                  onClick={() => toggleEventExpanded(evt.id)}
                   className="p-3.5 sm:p-4 flex items-start justify-between gap-3 cursor-pointer select-none hover:opacity-95 transition-opacity"
                 >
                   <div className="min-w-0 flex-1">
@@ -910,9 +787,6 @@ export const InteractiveDaySchedule: React.FC<InteractiveDayScheduleProps> = ({
 
                   </div>
                 )}
-              </div>
-            );
-          })}
               </div>
             );
           })}

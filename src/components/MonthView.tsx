@@ -40,7 +40,7 @@ export const MonthView: React.FC<MonthViewProps> = ({
   sortOption = 'time',
   sortDirection = 'none',
 }) => {
-  const { partner1Label, partner2Label, user1Theme, user2Theme } = useAuth();
+  const { partner1Label, partner2Label, partner1Initial, partner2Initial, user1Theme, user2Theme } = useAuth();
   const [collapsedEventIds, setCollapsedEventIds] = useState<Record<string, boolean>>({});
   const [expandedTaskIds, setExpandedTaskIds] = useState<Record<string, boolean>>({});
 
@@ -105,13 +105,66 @@ export const MonthView: React.FC<MonthViewProps> = ({
             <div
               key={cell.dateStr}
               onClick={() => onSelectDate(cell.dateStr)}
-              className={`min-h-[135px] sm:min-h-[160px] xl:min-h-[180px] p-2 sm:p-2.5 transition-all cursor-pointer relative group flex flex-col justify-between ${
+              className={`min-h-[60px] md:min-h-[135px] lg:min-h-[160px] xl:min-h-[180px] p-1 md:p-2 sm:p-2.5 transition-all cursor-pointer relative group flex flex-col justify-between ${
                 !cell.isCurrentMonth
                   ? 'bg-[#f3f0e8]/40 dark:bg-[#16181c]/50 text-stone-400 dark:text-stone-600'
                   : 'bg-[#fcfaf6] dark:bg-[#1d2026] hover:bg-[#f6f2ea] dark:hover:bg-[#23272e] text-stone-800 dark:text-stone-200'
               } ${isSelected ? 'ring-2 ring-stone-900 dark:ring-stone-100 ring-inset z-10 bg-[#f5f0e6] dark:bg-[#262a32]' : ''}`}
             >
-              <div>
+              {/* Mobile View: Compact cell with Day number, Stay badge letter, and category dots + event count */}
+              <div className="md:hidden flex flex-col justify-between h-full">
+                <div className="flex items-center justify-between">
+                  <span
+                    className={`text-xs font-semibold rounded-full w-5 h-5 flex items-center justify-center ${
+                      cell.isToday
+                        ? 'bg-stone-900 dark:bg-white text-white dark:text-stone-950 font-bold'
+                        : cell.isCurrentMonth
+                        ? 'text-stone-800 dark:text-stone-200'
+                        : 'text-stone-400 dark:text-stone-600'
+                    }`}
+                  >
+                    {cell.dayNum}
+                  </span>
+                  {stayInfo && cell.isCurrentMonth && (
+                    <span
+                      title={`Stay: ${stayInfo.stayAt === 'our_home' ? 'Our Home' : stayInfo.stayAt === 'her_home' ? partner1Label : partner2Label}`}
+                      className={`w-4 h-4 rounded-xs text-[9px] font-bold flex items-center justify-center uppercase shadow-2xs ${
+                        stayInfo.stayAt === 'our_home'
+                          ? 'bg-black text-white dark:bg-stone-900 dark:text-white'
+                          : stayInfo.stayAt === 'her_home'
+                          ? user1Theme.badgeBg
+                          : user2Theme.badgeBg
+                      }`}
+                    >
+                      {stayInfo.stayAt === 'our_home' ? 'H' : stayInfo.stayAt === 'her_home' ? partner1Initial : partner2Initial}
+                    </span>
+                  )}
+                </div>
+
+                {/* Category dots + event count badge */}
+                {cell.isCurrentMonth && dayEvents.length > 0 && (
+                  <div className="mt-1 flex items-center justify-between gap-0.5">
+                    <div className="flex items-center gap-0.5 overflow-hidden">
+                      {dayEvents.slice(0, 3).map((evt) => {
+                        const cfg = CATEGORY_CONFIG[evt.category];
+                        return (
+                          <span
+                            key={evt.id}
+                            className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.dotColor || 'bg-stone-500'}`}
+                            title={evt.title}
+                          />
+                        );
+                      })}
+                    </div>
+                    <span className="text-[9px] font-mono px-1 py-0.2 rounded-xs bg-stone-200/80 dark:bg-stone-800 text-stone-700 dark:text-stone-300 font-bold leading-none">
+                      {dayEvents.length}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Desktop View: Full rich expandable event pills with inline tasks */}
+              <div className="hidden md:block">
                 {/* Day Header Row: Day number + Moon phase + Stay location indicator ("Hers" / "His" / "Home") */}
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-1">

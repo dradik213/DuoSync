@@ -106,9 +106,19 @@ function CalendarApp() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const existingIds = new Set(parsed.map((e: CalendarEvent) => e.id));
-          const missing = INITIAL_EVENTS.filter((e) => !existingIds.has(e.id));
-          return [...parsed, ...missing];
+          const combined = [...parsed, ...INITIAL_EVENTS];
+          const seenIds = new Set<string>();
+          const seenKeys = new Set<string>();
+          const deduped: CalendarEvent[] = [];
+          for (const evt of combined) {
+            const key = `${evt.title}_${evt.startDate}`;
+            if (!seenIds.has(evt.id) && !seenKeys.has(key)) {
+              seenIds.add(evt.id);
+              seenKeys.add(key);
+              deduped.push(evt);
+            }
+          }
+          return deduped;
         }
       }
     } catch (e) {}
@@ -506,9 +516,19 @@ function CalendarApp() {
     // Real-time events listener
     const unsubEvents = subscribeToEvents(currentHub.id, (remoteEvents) => {
       if (remoteEvents.length > 0) {
-        const remoteIds = new Set(remoteEvents.map((e) => e.id));
-        const missing = INITIAL_EVENTS.filter((e) => !remoteIds.has(e.id));
-        setEvents([...remoteEvents, ...missing]);
+        const combined = [...remoteEvents, ...INITIAL_EVENTS];
+        const seenIds = new Set<string>();
+        const seenKeys = new Set<string>();
+        const deduped: CalendarEvent[] = [];
+        for (const evt of combined) {
+          const key = `${evt.title}_${evt.startDate}`;
+          if (!seenIds.has(evt.id) && !seenKeys.has(key)) {
+            seenIds.add(evt.id);
+            seenKeys.add(key);
+            deduped.push(evt);
+          }
+        }
+        setEvents(deduped);
       }
     });
 
@@ -883,7 +903,7 @@ function CalendarApp() {
             {/* Left/Main Column: Generous wide calendar column */}
             <div
               className={`transition-all duration-300 ${
-                isDayInspectorOpen ? 'lg:col-span-8 xl:col-span-8 2xl:col-span-9' : 'lg:col-span-12'
+                viewMode === 'month' && isDayInspectorOpen ? 'lg:col-span-8 xl:col-span-8 2xl:col-span-9' : 'lg:col-span-12'
               }`}
             >
               {viewMode === 'month' && (
@@ -909,6 +929,9 @@ function CalendarApp() {
                   selectedDate={selectedDate}
                   onSelectDate={handleSelectDate}
                   onToggleTask={handleToggleTask}
+                  onAddTaskToEvent={handleAddTaskToEvent}
+                  onDeleteTaskFromEvent={handleDeleteTaskFromEvent}
+                  onDeleteEvent={handleDeleteEvent}
                   categoryFilter={categoryFilter}
                   partnerFilter={partnerFilter}
                   sortOption={sortOption}
@@ -916,26 +939,28 @@ function CalendarApp() {
                 />
               )}
 
-              {/* Bottom Quick-Back Bar - Only a viewer toggle, NO add button here */}
-              <div className="mt-3 flex items-center justify-between text-xs text-stone-500 dark:text-stone-400 px-1">
-                <p>
-                  Click any day to view details, toggle tasks, or record bullet notes.
-                </p>
-                {!isDayInspectorOpen && (
-                  <button
-                    type="button"
-                    onClick={() => setIsDayInspectorOpen(true)}
-                    className="font-medium text-stone-800 dark:text-stone-200 hover:underline inline-flex items-center gap-1 cursor-pointer"
-                  >
-                    <Eye className="w-3.5 h-3.5" />
-                    <span>View Day Details</span>
-                  </button>
-                )}
-              </div>
+              {/* Bottom Quick-Back Bar - Only for month view */}
+              {viewMode === 'month' && (
+                <div className="mt-3 flex items-center justify-between text-xs text-stone-500 dark:text-stone-400 px-1">
+                  <p>
+                    Click any day to view details, toggle tasks, or record bullet notes.
+                  </p>
+                  {!isDayInspectorOpen && (
+                    <button
+                      type="button"
+                      onClick={() => setIsDayInspectorOpen(true)}
+                      className="font-medium text-stone-800 dark:text-stone-200 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>View Day Details</span>
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
-            {/* Right Column: Day Details Inspector */}
-            {isDayInspectorOpen && (
+            {/* Right Column: Day Details Inspector - ONLY when viewMode === 'month' */}
+            {viewMode === 'month' && isDayInspectorOpen && (
               <div className="lg:col-span-4 xl:col-span-4 2xl:col-span-3 sticky top-24 space-y-4">
                 <DayInspector
                   selectedDate={selectedDate}

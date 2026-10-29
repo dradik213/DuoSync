@@ -190,13 +190,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (e) {}
   }, [currentUserId]);
 
-  const currentUser = users.find((u) => u.id === currentUserId) || null;
-  const currentHub = hubs.find((h) => h.id === currentUser?.hubId) || null;
+  const currentUser = users.find((u) => u.id === currentUserId) || users[0] || null;
+  const currentHub = hubs.find((h) => h.id === currentUser?.hubId) || hubs[0] || null;
   
-  // The partner is the other user in the same hub
-  const partnerUser = (currentHub?.members.find((m) => m.id !== currentUser?.id) || null)
-    ? users.find((u) => u.id === currentHub?.members.find((m) => m.id !== currentUser?.id)?.id) || null
-    : null;
+  // The partner is the other user in the same hub or user list
+  const otherMember = currentHub?.members.find((m) => m.id !== currentUser?.id);
+  const partnerUser = otherMember
+    ? (users.find((u) => u.id === otherMember.id || (u.email && otherMember.email && u.email.toLowerCase() === otherMember.email.toLowerCase())) || otherMember)
+    : (users.find((u) => u.id !== currentUser?.id) || null);
+
+  // Female partner (Katherine) & Male partner (Dustin)
+  const femaleUser = users.find((u) => u.gender === 'female' || u.name?.toLowerCase().includes('katherine')) ||
+    (currentUser?.gender === 'female' ? currentUser : partnerUser);
+  const maleUser = users.find((u) => u.gender === 'male' || u.name?.toLowerCase().includes('dustin')) ||
+    (currentUser?.gender === 'male' ? currentUser : partnerUser);
 
   const userPronouns = currentUser 
     ? getPronounInfo(currentUser.gender, currentUser.customPronoun)
@@ -204,9 +211,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const partnerPronouns = partnerUser
     ? getPronounInfo(partnerUser.gender, partnerUser.customPronoun)
-    : getPronounInfo('female');
+    : getPronounInfo('male');
 
-  // Dynamic Couple View reference: e.g. "Her / Her", "Her / His", "His / His", "Their / Her"
+  // Dynamic Couple View reference
   let coupleViewLabel = 'Couple View';
   if (currentUser && partnerUser) {
     coupleViewLabel = `${userPronouns.shortLabel} / ${partnerPronouns.shortLabel}`;
@@ -214,37 +221,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     coupleViewLabel = `${userPronouns.shortLabel} & Partner`;
   }
 
-  // Label for User 1 & Partner 2
-  // When both users have the same gender (e.g. both Her), distinguish by name: "Her (Sarah)" & "Her (Emma)"
-  const isSamePronoun = currentUser && partnerUser && userPronouns.shortLabel === partnerPronouns.shortLabel;
-  const partner1Label = currentUser 
-    ? (isSamePronoun ? `${userPronouns.shortLabel} (${currentUser.name})` : userPronouns.possessive)
-    : 'Hers';
-  const partner2Label = partnerUser 
-    ? (isSamePronoun ? `${partnerPronouns.shortLabel} (${partnerUser.name})` : partnerPronouns.possessive)
-    : 'Partner';
+  // Consistent partner labels & initials: Katherine is 'K' ('Hers'), Dustin is 'D' ('His')
+  const partner1Label = 'Hers';
+  const partner2Label = 'His';
+  const partner1DisplayName = femaleUser?.name || 'Katherine';
+  const partner2DisplayName = maleUser?.name || 'Dustin';
+  const partner1Initial = femaleUser?.name?.trim().charAt(0).toUpperCase() || 'K';
+  const partner2Initial = maleUser?.name?.trim().charAt(0).toUpperCase() || 'D';
 
-  const partner1Initial = currentUser?.name?.trim() 
-    ? currentUser.name.trim().charAt(0).toUpperCase() 
-    : 'U';
-  const partner2Initial = partnerUser?.name?.trim() 
-    ? partnerUser.name.trim().charAt(0).toUpperCase() 
-    : 'P';
-  const partner1DisplayName = currentUser?.name || partner1Label;
-  const partner2DisplayName = partnerUser?.name || partner2Label;
-
-  // Dynamic color theme referencing color specified in user's profile
-  // User 1 is currentUser (on left side of slider)
-  const user1Theme = getUserColorTheme(
-    currentUser?.avatarColor,
-    currentUser?.gender === 'male' ? 'blue' : 'purple'
-  );
-
-  // User 2 is partnerUser (on right side of slider)
-  const user2Theme = getUserColorTheme(
-    partnerUser?.avatarColor,
-    user1Theme.name === 'Blue' ? 'purple' : 'blue'
-  );
+  // Dynamic color themes: Katherine is purple, Dustin is blue
+  const user1Theme = getUserColorTheme(femaleUser?.avatarColor || 'bg-purple-600', 'purple');
+  const user2Theme = getUserColorTheme(maleUser?.avatarColor || 'bg-blue-600', 'blue');
 
   // Real-time synchronization for active couple hub across devices
   useEffect(() => {

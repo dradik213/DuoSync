@@ -447,13 +447,6 @@ export const ReflectionDashboard: React.FC<ReflectionDashboardProps> = ({
                         {t.eventTitle} · {formatReadableDate(t.date)}
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => onNavigateToDay(t.date)}
-                      className="text-xs font-medium text-stone-700 dark:text-stone-300 hover:text-stone-900 bg-stone-100 dark:bg-[#2a2e36] border border-[#e4ded5] dark:border-[#353943] px-2.5 py-1 rounded shrink-0 cursor-pointer"
-                    >
-                      View Day
-                    </button>
                   </div>
                 ))}
               </div>

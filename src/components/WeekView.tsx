@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Home, ChevronDown, ChevronUp, Check } from 'lucide-react';
+import { Home, ChevronDown, ChevronUp, X, Trash2 } from 'lucide-react';
 import { CalendarEvent, DayStayInfo, EventCategory, EventSortOption, SortDirection } from '../types/calendar';
 import { CATEGORY_CONFIG, formatDateToYMD, sortEventsForDay, formatTimeRange, formatUsTime, matchesPartnerFilter, eventOccursOnDate } from '../utils/calendarUtils';
 import { getMoonPhase } from '../utils/astronomyUtils';
 import { useAuth } from '../context/AuthContext';
+import { TaskToggleSlider } from './TaskToggleSlider';
 
 interface WeekViewProps {
   currentDate: Date;
@@ -12,6 +13,9 @@ interface WeekViewProps {
   selectedDate: string;
   onSelectDate: (dateStr: string) => void;
   onToggleTask?: (eventId: string, taskId: string, completed: boolean) => void;
+  onAddTaskToEvent?: (eventId: string, taskTitle: string, assignedTo?: 'both' | 'him' | 'her') => void;
+  onDeleteTaskFromEvent?: (eventId: string, taskId: string) => void;
+  onDeleteEvent?: (eventId: string) => void;
   categoryFilter: EventCategory | 'all';
   partnerFilter: 'all' | 'her' | 'him';
   sortOption?: EventSortOption;
@@ -25,6 +29,9 @@ export const WeekView: React.FC<WeekViewProps> = ({
   selectedDate,
   onSelectDate,
   onToggleTask,
+  onAddTaskToEvent,
+  onDeleteTaskFromEvent,
+  onDeleteEvent,
   categoryFilter,
   partnerFilter,
   sortOption = 'time',
@@ -33,6 +40,7 @@ export const WeekView: React.FC<WeekViewProps> = ({
   const { partner1Label, partner2Label, user1Theme, user2Theme } = useAuth();
   const [collapsedEventIds, setCollapsedEventIds] = useState<Record<string, boolean>>({});
   const [expandedTaskIds, setExpandedTaskIds] = useState<Record<string, boolean>>({});
+  const [newTaskInputs, setNewTaskInputs] = useState<Record<string, string>>({});
 
   const toggleEvent = (eventId: string) => {
     setCollapsedEventIds((prev) => ({
@@ -46,6 +54,13 @@ export const WeekView: React.FC<WeekViewProps> = ({
       ...prev,
       [eventId]: !prev[eventId],
     }));
+  };
+
+  const handleCreateTask = (eventId: string) => {
+    const val = (newTaskInputs[eventId] || '').trim();
+    if (!val || !onAddTaskToEvent) return;
+    onAddTaskToEvent(eventId, val, 'both');
+    setNewTaskInputs((prev) => ({ ...prev, [eventId]: '' }));
   };
   const curr = new Date(currentDate);
   const dayOfWeek = (curr.getDay() + 6) % 7;
@@ -178,7 +193,7 @@ export const WeekView: React.FC<WeekViewProps> = ({
                           </div>
 
                           <div className="flex items-center gap-0.5 shrink-0">
-                            {tasks.length > 0 && (
+                            {(tasks.length > 0 || onAddTaskToEvent) && (
                               <button
                                 type="button"
                                 onClick={(e) => {
@@ -203,6 +218,19 @@ export const WeekView: React.FC<WeekViewProps> = ({
                             >
                               {isEventCollapsed ? <ChevronDown className="w-2.5 h-2.5" /> : <ChevronUp className="w-2.5 h-2.5" />}
                             </button>
+                            {onDeleteEvent && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onDeleteEvent(evt.id);
+                                }}
+                                className="p-0.5 rounded text-stone-400 hover:text-rose-500 cursor-pointer transition-colors"
+                                title="Delete event"
+                              >
+                                <Trash2 className="w-2.5 h-2.5" />
+                              </button>
+                            )}
                           </div>
                         </div>
 
@@ -225,31 +253,64 @@ export const WeekView: React.FC<WeekViewProps> = ({
                           </div>
                         )}
 
-                        {/* Independent Checklist Tasks Expansion */}
-                        {isTasksExpanded && tasks.length > 0 && (
-                          <div className="mt-1.5 pt-1 border-t border-black/10 dark:border-white/10 space-y-1">
+                        {/* Independent Checklist Tasks Expansion with TaskToggleSlider & Delete button */}
+                        {isTasksExpanded && (
+                          <div className="mt-1.5 pt-1.5 border-t border-black/10 dark:border-white/10 space-y-1.5">
                             {tasks.map((task) => (
                               <div
                                 key={task.id}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (onToggleTask) {
-                                    onToggleTask(evt.id, task.id, !task.completed);
-                                  }
-                                }}
-                                className="flex items-center gap-1.5 text-[10px] cursor-pointer hover:opacity-80 select-none py-0.5"
-                                title={onToggleTask ? 'Click to toggle completion' : task.title}
+                                className={`p-1.5 rounded-md border flex items-center justify-between gap-1.5 transition-colors ${
+                                  task.completed
+                                    ? 'bg-stone-100/70 dark:bg-[#1f2229] border-stone-200 dark:border-stone-800 text-stone-400'
+                                    : 'bg-white/80 dark:bg-[#22252c] border-stone-200/80 dark:border-stone-700/60 text-stone-800 dark:text-stone-200'
+                                }`}
                               >
-                                <span className={`w-3 h-3 rounded-xs border flex items-center justify-center shrink-0 ${
-                                  task.completed ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-stone-400 dark:border-stone-500 bg-white dark:bg-black/40'
-                                }`}>
-                                  {task.completed && <Check className="w-2 h-2 stroke-[3]" />}
-                                </span>
-                                <span className={`truncate text-[10px] ${task.completed ? 'line-through opacity-60 text-stone-500' : 'text-stone-800 dark:text-stone-200'}`}>
-                                  {task.title}
-                                </span>
+                                <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                  <TaskToggleSlider
+                                    checked={task.completed}
+                                    onChange={(newChecked) => onToggleTask && onToggleTask(evt.id, task.id, newChecked)}
+                                    label={task.title}
+                                  />
+                                  <span className={`text-[10px] ${task.completed ? 'line-through text-stone-400 dark:text-stone-500' : 'text-stone-800 dark:text-stone-200'} truncate`}>
+                                    {task.title}
+                                  </span>
+                                </div>
+                                {onDeleteTaskFromEvent && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onDeleteTaskFromEvent(evt.id, task.id);
+                                    }}
+                                    className="text-stone-300 hover:text-rose-500 p-0.5 cursor-pointer transition-colors"
+                                    title="Delete task"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                )}
                               </div>
                             ))}
+
+                            {/* Type task & press Enter to add... input */}
+                            {onAddTaskToEvent && (
+                              <div className="pt-0.5 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                <input
+                                  type="text"
+                                  placeholder="Type task & press Enter to add..."
+                                  value={newTaskInputs[evt.id] || ''}
+                                  onChange={(e) =>
+                                    setNewTaskInputs((prev) => ({ ...prev, [evt.id]: e.target.value }))
+                                  }
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      handleCreateTask(evt.id);
+                                    }
+                                  }}
+                                  className="w-full text-[10px] px-2 py-1 rounded border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 placeholder:text-stone-400 focus:outline-hidden focus:ring-1 focus:ring-stone-400 font-sans"
+                                />
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

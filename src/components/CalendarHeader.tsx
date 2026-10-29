@@ -199,7 +199,8 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
 
           {/* Brand Title: Synchronized with currentHub?.name from Admin */}
           <h1 className="text-sm sm:text-base md:text-lg font-serif font-bold tracking-tight text-stone-900 dark:text-stone-100 truncate">
-            {currentHub?.name || 'Shared Life Hub'}
+            <span className="sm:hidden">Life Hub</span>
+            <span className="hidden sm:inline">{currentHub?.name || 'Shared Life Hub'}</span>
           </h1>
         </div>
 
@@ -440,13 +441,13 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
       <div className="w-full max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-2 border-t border-[#e5e0d8] dark:border-[#2d3139] flex flex-wrap items-center justify-between gap-3 text-sm">
         
         {/* Top-left Navigation: Stays consistent, functions based on user view (Month, Week, Day, All Time) */}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center border border-[#e2ddd5] dark:border-[#353943] rounded-lg overflow-hidden bg-white dark:bg-[#202329] shadow-2xs">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <div className="flex items-center border border-[#e2ddd5] dark:border-[#353943] rounded-lg overflow-hidden bg-white dark:bg-[#202329] shadow-2xs shrink-0">
             <button
               type="button"
               onClick={onPrev}
               aria-label="Previous period"
-              className="p-1 hover:bg-stone-100 dark:hover:bg-[#2a2e36] text-stone-600 dark:text-stone-300 transition-colors cursor-pointer"
+              className="p-1 hover:bg-stone-100 dark:hover:bg-[#2a2e36] text-stone-600 dark:text-stone-300 transition-colors cursor-pointer shrink-0"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -454,7 +455,7 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
               type="button"
               onClick={onNext}
               aria-label="Next period"
-              className="p-1 hover:bg-stone-100 dark:hover:bg-[#2a2e36] text-stone-600 dark:text-stone-300 transition-colors border-l border-[#e2ddd5] dark:border-[#353943] cursor-pointer"
+              className="p-1 hover:bg-stone-100 dark:hover:bg-[#2a2e36] text-stone-600 dark:text-stone-300 transition-colors border-l border-[#e2ddd5] dark:border-[#353943] cursor-pointer shrink-0"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -463,7 +464,7 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
           <button
             type="button"
             onClick={onToday}
-            className="text-xs font-medium text-stone-700 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white border border-[#e2ddd5] dark:border-[#353943] hover:bg-white dark:hover:bg-[#22252b] px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+            className="text-xs font-medium text-stone-700 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white border border-[#e2ddd5] dark:border-[#353943] hover:bg-white dark:hover:bg-[#22252b] px-2.5 py-1 rounded-lg transition-colors cursor-pointer shrink-0"
           >
             Today
           </button>
