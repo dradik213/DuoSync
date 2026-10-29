@@ -40,8 +40,12 @@ import { Eye, Plus } from 'lucide-react';
 
 function CalendarApp() {
   const { currentUser, currentHub, updateProfile } = useAuth();
-  // Default to today and Daily Schedule view per user instruction with localStorage memory
-  const [currentDate, setCurrentDate] = useState<Date>(() => new Date());
+  // Default to November 2026 test month for Dustin & Katherine
+  const [currentDate, setCurrentDate] = useState<Date>(() => {
+    const now = new Date();
+    if (now.getFullYear() === 2026 && now.getMonth() === 10) return now;
+    return new Date(2026, 10, 1);
+  });
   const [viewMode, setViewMode] = useState<CalendarViewMode>(() => {
     try {
       const saved = localStorage.getItem('duosync_view_mode');
@@ -49,7 +53,7 @@ function CalendarApp() {
         return saved as CalendarViewMode;
       }
     } catch (e) {}
-    return 'agenda';
+    return 'month';
   });
 
   useEffect(() => {
@@ -87,15 +91,24 @@ function CalendarApp() {
     }
   };
 
-  // Selected date defaults to today
-  const [selectedDate, setSelectedDate] = useState<string>(() => formatDateToYMD(new Date()));
+  // Selected date defaults to first day of November test schedule (2026-11-01)
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    const today = formatDateToYMD(new Date());
+    if (today.startsWith('2026-11')) return today;
+    return '2026-11-01';
+  });
   const [isDayInspectorOpen, setIsDayInspectorOpen] = useState<boolean>(true);
   
-  // Events and Stays state initialized clean with localStorage persistence
+  // Events and Stays state initialized with full November 2026 schedule for Dustin & Katherine
   const [events, setEvents] = useState<CalendarEvent[]>(() => {
     try {
       const saved = localStorage.getItem('hub_events');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0 && parsed.some((e: CalendarEvent) => e.startDate?.startsWith('2026-11'))) {
+          return parsed;
+        }
+      }
     } catch (e) {}
     return INITIAL_EVENTS;
   });
@@ -103,7 +116,12 @@ function CalendarApp() {
   const [stays, setStays] = useState<Record<string, DayStayInfo>>(() => {
     try {
       const saved = localStorage.getItem('hub_stays');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && Object.keys(parsed).length > 0 && Object.keys(parsed).some((k) => k.startsWith('2026-11'))) {
+          return parsed;
+        }
+      }
     } catch (e) {}
     return MOCK_STAYS;
   });
@@ -1001,6 +1019,16 @@ function CalendarApp() {
           try {
             localStorage.removeItem('hub_events');
             localStorage.removeItem('hub_stays');
+          } catch (e) {}
+        }}
+        onLoadNovemberTestData={() => {
+          setEvents(INITIAL_EVENTS);
+          setStays(MOCK_STAYS);
+          setCurrentDate(new Date(2026, 10, 1));
+          setSelectedDate('2026-11-01');
+          try {
+            localStorage.setItem('hub_events', JSON.stringify(INITIAL_EVENTS));
+            localStorage.setItem('hub_stays', JSON.stringify(MOCK_STAYS));
           } catch (e) {}
         }}
         onOpenInviteModal={() => setIsInviteModalOpen(true)}

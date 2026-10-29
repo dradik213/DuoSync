@@ -112,6 +112,7 @@ interface UnifiedWorkspaceModalProps {
   onReorderTemplates?: (templates: PlanTemplate[]) => void;
   onResetTemplates: () => void;
   onClearAllEventsAndStays?: () => void;
+  onLoadNovemberTestData?: () => void;
   onOpenInviteModal?: () => void;
   onOpenProfileModal?: () => void;
   // AI & Google Workspace props
@@ -146,6 +147,7 @@ export const UnifiedWorkspaceModal: React.FC<UnifiedWorkspaceModalProps> = ({
   onReorderTemplates,
   onResetTemplates,
   onClearAllEventsAndStays,
+  onLoadNovemberTestData,
   onOpenInviteModal,
   onOpenProfileModal,
   onAddEventFromAI,
@@ -1194,6 +1196,32 @@ export const UnifiedWorkspaceModal: React.FC<UnifiedWorkspaceModalProps> = ({
                       </button>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* November Test Dataset Loader */}
+              {onLoadNovemberTestData && (
+                <div className="p-4 rounded-xl border border-purple-200 dark:border-purple-900/60 bg-purple-50/50 dark:bg-purple-950/20 space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h4 className="font-bold text-xs text-purple-950 dark:text-purple-200">
+                        November Test Schedule (Dustin & Katherine)
+                      </h4>
+                      <p className="text-[11px] text-purple-700 dark:text-purple-400">
+                        Loads the complete 30-day November calendar: alternating stays, 9:30 PM dog care, daily dinners, 6 weekend markets, and Thanksgiving week.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onLoadNovemberTestData();
+                        showAdminFeedback('November test schedule reloaded!');
+                      }}
+                      className="text-xs font-bold px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white cursor-pointer shadow-xs shrink-0 transition-colors"
+                    >
+                      Reload November Schedule
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

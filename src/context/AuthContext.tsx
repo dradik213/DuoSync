@@ -61,9 +61,9 @@ const CURRENT_USER_KEY = 'duosync_current_user_id';
 // Default Admin Test Account for testing without having to create an account each time
 export const DEFAULT_ADMIN_USER: UserAccount = {
   id: 'usr-admin-001',
-  name: 'Admin Tester',
-  email: 'admin@duosync.app',
-  gender: 'female',
+  name: 'Dustin',
+  email: 'dustin@duosync.app',
+  gender: 'male',
   avatarColor: 'bg-blue-600',
   hubId: 'hub-admin-default',
   role: 'owner',
@@ -72,9 +72,9 @@ export const DEFAULT_ADMIN_USER: UserAccount = {
 
 export const DEFAULT_PARTNER_USER: UserAccount = {
   id: 'usr-admin-partner-002',
-  name: 'Alex',
-  email: 'alex@duosync.app',
-  gender: 'male',
+  name: 'Katherine',
+  email: 'katherine@duosync.app',
+  gender: 'female',
   avatarColor: 'bg-purple-600',
   hubId: 'hub-admin-default',
   role: 'partner',
@@ -83,8 +83,8 @@ export const DEFAULT_PARTNER_USER: UserAccount = {
 
 export const DEFAULT_ADMIN_HUB: SharedHub = {
   id: 'hub-admin-default',
-  name: 'Admin Shared Hub',
-  inviteCode: 'ADMIN-SYNC',
+  name: "Dustin & Katherine's Life Hub",
+  inviteCode: 'DUSTIN-KATH',
   members: [DEFAULT_ADMIN_USER, DEFAULT_PARTNER_USER],
   createdAt: '2026-01-01T00:00:00.000Z',
 };
