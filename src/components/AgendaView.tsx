@@ -5,7 +5,7 @@ import {
   Home
 } from 'lucide-react';
 import { CalendarEvent, DayStayInfo, EventCategory, EventSortOption, SortDirection } from '../types/calendar';
-import { CATEGORY_CONFIG, formatReadableDate, sortEventsForDay, formatTimeRange } from '../utils/calendarUtils';
+import { CATEGORY_CONFIG, formatReadableDate, sortEventsForDay, formatTimeRange, matchesPartnerFilter } from '../utils/calendarUtils';
 import { useAuth } from '../context/AuthContext';
 
 interface AgendaViewProps {
@@ -31,11 +31,7 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
   // Filter events
   const filteredEvents = events.filter((evt) => {
     if (categoryFilter !== 'all' && evt.category !== categoryFilter) return false;
-    if (partnerFilter !== 'all') {
-      if (partnerFilter === 'her' && evt.assignedTo === 'him') return false;
-      if (partnerFilter === 'him' && evt.assignedTo === 'her') return false;
-    }
-    return true;
+    return matchesPartnerFilter(evt.assignedTo, partnerFilter);
   });
 
   // Group by date

@@ -96,7 +96,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const list = [...parsed];
+          const list = parsed.map((u: UserAccount) => {
+            if (u.id === 'usr-admin-001' || u.email.toLowerCase() === 'admin@duosync.app') {
+              return {
+                ...u,
+                name: DEFAULT_ADMIN_USER.name,
+                email: DEFAULT_ADMIN_USER.email,
+                gender: DEFAULT_ADMIN_USER.gender,
+                avatarColor: DEFAULT_ADMIN_USER.avatarColor,
+              };
+            }
+            if (u.id === 'usr-partner-002' || u.id === 'usr-admin-partner-002' || u.email.toLowerCase() === 'alex@duosync.app') {
+              return {
+                ...u,
+                id: DEFAULT_PARTNER_USER.id,
+                name: DEFAULT_PARTNER_USER.name,
+                email: DEFAULT_PARTNER_USER.email,
+                gender: DEFAULT_PARTNER_USER.gender,
+                avatarColor: DEFAULT_PARTNER_USER.avatarColor,
+              };
+            }
+            return u;
+          });
           if (!list.some((u: UserAccount) => u.email.toLowerCase() === DEFAULT_ADMIN_USER.email.toLowerCase())) {
             list.push(DEFAULT_ADMIN_USER);
           }
@@ -116,7 +137,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const list = [...parsed];
+          const list = parsed.map((h: SharedHub) => {
+            if (h.id === DEFAULT_ADMIN_HUB.id && (h.name === 'Admin Shared Hub' || !h.name || h.name.includes('Admin'))) {
+              return {
+                ...h,
+                name: DEFAULT_ADMIN_HUB.name,
+                inviteCode: DEFAULT_ADMIN_HUB.inviteCode,
+                members: [DEFAULT_ADMIN_USER, DEFAULT_PARTNER_USER],
+              };
+            }
+            return h;
+          });
           if (!list.some((h: SharedHub) => h.id === DEFAULT_ADMIN_HUB.id)) {
             list.push(DEFAULT_ADMIN_HUB);
           }

@@ -141,8 +141,11 @@ export const DayInspector: React.FC<DayInspectorProps> = ({
     }
   }, [selectedDate]);
 
-  // Day's events sorted by sortOption (items without time show AFTER items with time)
-  const dayEvents = sortEventsForDay(events, sortOption, sortDirection);
+  // Day's events sorted by sortOption (supports multi-day spans)
+  const activeDayEvents = (allEvents && allEvents.length > 0 ? allEvents : events).filter(
+    (e) => e.startDate <= selectedDate && (e.endDate || e.startDate) >= selectedDate
+  );
+  const dayEvents = sortEventsForDay(activeDayEvents, sortOption, sortDirection);
 
   // Unified Backlog: Checklist tasks marked not completed from past dates + Google Tasks
   const TODAY_STR = formatDateToYMD(new Date());

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Home } from 'lucide-react';
 import { CalendarEvent, DayStayInfo, EventCategory, EventSortOption, SortDirection } from '../types/calendar';
-import { CATEGORY_CONFIG, getMonthMatrix, sortEventsForDay, formatTimeRange, formatUsTime } from '../utils/calendarUtils';
+import { CATEGORY_CONFIG, getMonthMatrix, sortEventsForDay, formatTimeRange, formatUsTime, matchesPartnerFilter, eventOccursOnDate } from '../utils/calendarUtils';
 import { getMoonPhase } from '../utils/astronomyUtils';
 import { useAuth } from '../context/AuthContext';
 
@@ -46,17 +46,17 @@ export const MonthView: React.FC<MonthViewProps> = ({
   // Filter events based on active category & partner perspective
   const filteredEvents = events.filter((evt) => {
     if (categoryFilter !== 'all' && evt.category !== categoryFilter) return false;
-    if (partnerFilter !== 'all') {
-      if (partnerFilter === 'her' && evt.assignedTo === 'him') return false;
-      if (partnerFilter === 'him' && evt.assignedTo === 'her') return false;
-    }
-    return true;
+    return matchesPartnerFilter(evt.assignedTo, partnerFilter);
   });
 
-  // Group events by dateStr
+  // Group events by dateStr (supporting multi-day spans)
   const eventsByDate = filteredEvents.reduce<Record<string, CalendarEvent[]>>((acc, evt) => {
-    if (!acc[evt.startDate]) acc[evt.startDate] = [];
-    acc[evt.startDate].push(evt);
+    calendarCells.forEach((cell) => {
+      if (eventOccursOnDate(evt, cell.dateStr)) {
+        if (!acc[cell.dateStr]) acc[cell.dateStr] = [];
+        acc[cell.dateStr].push(evt);
+      }
+    });
     return acc;
   }, {});
 

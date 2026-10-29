@@ -1,7 +1,7 @@
 import React from 'react';
 import { Home } from 'lucide-react';
 import { CalendarEvent, DayStayInfo, EventCategory, EventSortOption, SortDirection } from '../types/calendar';
-import { CATEGORY_CONFIG, formatDateToYMD, sortEventsForDay, formatTimeRange, formatUsTime } from '../utils/calendarUtils';
+import { CATEGORY_CONFIG, formatDateToYMD, sortEventsForDay, formatTimeRange, formatUsTime, matchesPartnerFilter, eventOccursOnDate } from '../utils/calendarUtils';
 import { getMoonPhase } from '../utils/astronomyUtils';
 import { useAuth } from '../context/AuthContext';
 
@@ -60,11 +60,7 @@ export const WeekView: React.FC<WeekViewProps> = ({
   // Filter events
   const filteredEvents = events.filter((evt) => {
     if (categoryFilter !== 'all' && evt.category !== categoryFilter) return false;
-    if (partnerFilter !== 'all') {
-      if (partnerFilter === 'her' && evt.assignedTo === 'him') return false;
-      if (partnerFilter === 'him' && evt.assignedTo === 'her') return false;
-    }
-    return true;
+    return matchesPartnerFilter(evt.assignedTo, partnerFilter);
   });
 
   return (
@@ -86,7 +82,7 @@ export const WeekView: React.FC<WeekViewProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-7 divide-y md:divide-y-0 md:divide-x divide-[#e4ded5] dark:divide-[#2d3139]">
         {weekDays.map((col) => {
           const isSelected = selectedDate === col.dateStr;
-          const matching = filteredEvents.filter((e) => e.startDate === col.dateStr);
+          const matching = filteredEvents.filter((e) => eventOccursOnDate(e, col.dateStr));
           const dayEvents = sortEventsForDay(matching, sortOption, sortDirection);
           const stayInfo = stays[col.dateStr];
 

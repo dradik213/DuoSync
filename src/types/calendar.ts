@@ -22,6 +22,7 @@ export interface CalendarEvent {
   category: EventCategory;
   emoji?: string; // Customizable event emoji
   startDate: string; // YYYY-MM-DD
+  endDate?: string; // YYYY-MM-DD
   startTime?: string; // HH:mm
   endTime?: string;
   locationName?: string;

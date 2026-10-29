@@ -26,7 +26,7 @@ import {
   ShoppingBag
 } from 'lucide-react';
 import { CalendarEvent, DayStayInfo, EventCategory, EventSortOption, EventTask, MarketPackoutItem, MarketSaleRecord, SortDirection, StayLocation } from '../types/calendar';
-import { CATEGORY_CONFIG, formatReadableDate, sortEventsForDay, formatTimeRange, formatUsTime, formatDateToYMD } from '../utils/calendarUtils';
+import { CATEGORY_CONFIG, formatReadableDate, sortEventsForDay, formatTimeRange, formatUsTime, formatDateToYMD, matchesPartnerFilter, eventOccursOnDate } from '../utils/calendarUtils';
 import { getMoonPhase } from '../utils/astronomyUtils';
 import { TaskToggleSlider } from './TaskToggleSlider';
 import { useAuth } from '../context/AuthContext';
@@ -110,16 +110,12 @@ export const InteractiveDaySchedule: React.FC<InteractiveDayScheduleProps> = ({
     setDayNotes(currentStayNotes);
   }, [selectedDate, currentStayNotes]);
 
-  // Filter events for this specific day and sort using chosen sortOption (items without time after)
+  // Filter events for this specific day (supporting multi-day spans) and sort using chosen sortOption
   const filteredDayEvents = events
-    .filter((e) => e.startDate === selectedDate)
+    .filter((e) => eventOccursOnDate(e, selectedDate))
     .filter((e) => {
       if (categoryFilter !== 'all' && e.category !== categoryFilter) return false;
-      if (partnerFilter !== 'all') {
-        if (partnerFilter === 'her' && e.assignedTo === 'him') return false;
-        if (partnerFilter === 'him' && e.assignedTo === 'her') return false;
-      }
-      return true;
+      return matchesPartnerFilter(e.assignedTo, partnerFilter);
     });
 
   const dayEvents = sortEventsForDay(filteredDayEvents, sortOption, sortDirection);

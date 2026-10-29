@@ -579,3 +579,23 @@ export function formatTimeRange(startTime?: string, endTime?: string): string {
   return `${formatUsTime(startTime)} – ${formatUsTime(endTime)}`;
 }
 
+/**
+ * Centralized partner filter matcher:
+ * Returns true if the event's assignment matches the partnerFilter perspective.
+ */
+export function matchesPartnerFilter(assignedTo?: string, partnerFilter: string = 'all'): boolean {
+  if (partnerFilter === 'all') return true;
+  if (!assignedTo || assignedTo === 'both') return true;
+  if ((partnerFilter === 'him' || partnerFilter === 'his') && (assignedTo === 'him' || assignedTo === 'his')) return true;
+  if (partnerFilter === 'her' && (assignedTo === 'her' || assignedTo === 'hers')) return true;
+  return false;
+}
+
+/**
+ * Checks whether an event occurs on a specific date (supports multi-day event spans).
+ */
+export function eventOccursOnDate(event: { startDate: string; endDate?: string }, dateStr: string): boolean {
+  if (!event || !event.startDate) return false;
+  return event.startDate <= dateStr && (event.endDate || event.startDate) >= dateStr;
+}
+

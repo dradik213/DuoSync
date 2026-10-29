@@ -40,7 +40,7 @@ export const ReflectionDashboard: React.FC<ReflectionDashboardProps> = ({
   onToday,
   onNavigateToDay,
 }) => {
-  const { partner1Label, partner2Label } = useAuth();
+  const { partner1Label, partner2Label, partner1DisplayName, partner2DisplayName } = useAuth();
   const [aiInsights, setAiInsights] = useState<string | null>(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
@@ -56,16 +56,16 @@ export const ReflectionDashboard: React.FC<ReflectionDashboardProps> = ({
   const sundayStr = formatDateToYMD(sunday);
   const monthPrefix = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
 
-  // Filter events based on active timeframe
+  // Filter events based on active timeframe (supporting multi-day spans)
   const filteredEvents = events.filter((e) => {
     if (timeframe === 'day') {
-      return e.startDate === selectedDate;
+      return e.startDate <= selectedDate && (e.endDate || e.startDate) >= selectedDate;
     }
     if (timeframe === 'week') {
-      return e.startDate >= mondayStr && e.startDate <= sundayStr;
+      return e.startDate <= sundayStr && (e.endDate || e.startDate) >= mondayStr;
     }
     if (timeframe === 'month') {
-      return e.startDate.startsWith(monthPrefix);
+      return e.startDate.startsWith(monthPrefix) || (e.endDate && e.endDate.startsWith(monthPrefix));
     }
     return true; // 'all'
   });
@@ -84,10 +84,12 @@ export const ReflectionDashboard: React.FC<ReflectionDashboardProps> = ({
   const uncompletedTasksCount = totalTasksCount - completedTasksCount;
   const taskCompletionRate = totalTasksCount > 0 ? Math.round((completedTasksCount / totalTasksCount) * 100) : 0;
 
-  // Pop-Up Markets summary
+  // Pop-Up Markets summary (Target vs. Actual Revenue and Profits)
   const marketEvents = filteredEvents.filter((e) => e.category === 'market');
   const totalBoothFees = marketEvents.reduce((sum, e) => sum + (e.marketDetails?.boothFee || 0), 0);
   const totalTargetRevenue = marketEvents.reduce((sum, e) => sum + (e.marketDetails?.targetRevenue || 0), 0);
+  const totalActualRevenue = marketEvents.reduce((sum, e) => sum + (e.marketDetails?.actualRevenue ?? 0), 0);
+  const actualNetProfit = totalActualRevenue - totalBoothFees;
   const projectedNet = totalTargetRevenue - totalBoothFees;
 
   // Stays breakdown
@@ -100,6 +102,10 @@ export const ReflectionDashboard: React.FC<ReflectionDashboardProps> = ({
   const herNights = stayEntries.filter((s) => s.stayAt === 'her_home').length;
   const hisNights = stayEntries.filter((s) => s.stayAt === 'his_home').length;
   const homeNights = stayEntries.filter((s) => s.stayAt === 'our_home').length;
+  const totalTrackedNights = herNights + hisNights + homeNights;
+  const hisPercent = totalTrackedNights > 0 ? Math.round((hisNights / totalTrackedNights) * 100) : 0;
+  const herPercent = totalTrackedNights > 0 ? Math.round((herNights / totalTrackedNights) * 100) : 0;
+  const homePercent = Math.max(0, 100 - hisPercent - herPercent);
 
   // Notes from days & events
   const eventsWithNotes = filteredEvents.filter((e) => e.notes && e.notes.trim().length > 0);
@@ -322,20 +328,34 @@ export const ReflectionDashboard: React.FC<ReflectionDashboardProps> = ({
         {/* Pop-Up Market Financial Sum */}
         <div className="bg-[#fcfaf7] dark:bg-[#1a1d22] rounded-xl border border-[#e4ded5] dark:border-[#2d3139] p-4 shadow-2xs">
           <div className="flex items-center justify-between text-xs text-stone-500 dark:text-stone-400">
-            <span className="font-medium">Market Revenue Sum</span>
+            <span className="font-medium">Market Performance</span>
             <Store className="w-4 h-4 text-amber-600 dark:text-amber-400" />
           </div>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-2xl font-bold font-mono text-stone-900 dark:text-stone-100">
-              ${totalTargetRevenue}
+              ${totalActualRevenue}
             </span>
             <span className="text-xs text-stone-500 dark:text-stone-400">
-              ({marketEvents.length} markets)
+              Actual Gross ({marketEvents.length} mkts)
             </span>
           </div>
           <div className="text-[11px] text-stone-500 dark:text-stone-400 mt-2 flex items-center justify-between">
-            <span>Stall Fees: ${totalBoothFees}</span>
-            <span className="font-semibold text-emerald-700 dark:text-emerald-400">Net: +${projectedNet}</span>
+            <span>Fees: ${totalBoothFees}</span>
+            <span className={`font-semibold ${actualNetProfit >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+              Net Profit: ${actualNetProfit >= 0 ? `+${actualNetProfit}` : actualNetProfit}
+            </span>
+          </div>
+          <div className="mt-2 pt-2 border-t border-stone-200/60 dark:border-stone-800/60 flex items-center justify-between text-[10px] text-stone-500 dark:text-stone-400">
+            <span>Target: ${totalTargetRevenue}</span>
+            <span className="font-mono font-semibold">
+              {totalTargetRevenue > 0 ? `${Math.round((totalActualRevenue / totalTargetRevenue) * 100)}%` : '0%'} achieved
+            </span>
+          </div>
+          <div className="w-full bg-stone-200 dark:bg-stone-800 rounded-full h-1.5 mt-1 overflow-hidden">
+            <div
+              className="bg-amber-500 dark:bg-yellow-400 h-full rounded-full transition-all"
+              style={{ width: `${Math.min(100, totalTargetRevenue > 0 ? Math.round((totalActualRevenue / totalTargetRevenue) * 100) : 0)}%` }}
+            />
           </div>
         </div>
 
@@ -347,21 +367,43 @@ export const ReflectionDashboard: React.FC<ReflectionDashboardProps> = ({
           </div>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-2xl font-bold font-serif text-stone-900 dark:text-stone-100">
-              {herNights + hisNights + homeNights}
+              {totalTrackedNights}
             </span>
             <span className="text-xs text-stone-500 dark:text-stone-400">nights tracked</span>
           </div>
-          <div className="text-[11px] text-stone-500 dark:text-stone-400 mt-2 flex items-center gap-2 flex-wrap">
-            <span className="text-purple-700 dark:text-purple-400 font-medium">{partner1Label}: {herNights}d</span>
-            <span>·</span>
-            <span className="text-blue-700 dark:text-blue-400 font-medium">{partner2Label}: {hisNights}d</span>
-            {homeNights > 0 && (
-              <>
-                <span>·</span>
-                <span className="text-stone-900 dark:text-stone-100 font-bold bg-stone-200/80 dark:bg-stone-800 px-1.5 py-0.2 rounded text-[10px]">Home: {homeNights}d</span>
-              </>
-            )}
+          <div className="text-[11px] text-stone-500 dark:text-stone-400 mt-2 flex items-center justify-between">
+            <span className="font-semibold text-blue-700 dark:text-blue-400">
+              {partner1DisplayName || 'Dustin'}: {hisNights}d ({hisPercent}%)
+            </span>
+            <span className="font-semibold text-purple-700 dark:text-purple-400">
+              {partner2DisplayName || 'Katherine'}: {herNights}d ({herPercent}%)
+            </span>
           </div>
+          {/* Visual Two-Color Balance Bar */}
+          <div className="w-full bg-stone-200 dark:bg-stone-800 rounded-full h-2 mt-2 overflow-hidden flex">
+            <div
+              className="bg-blue-600 dark:bg-blue-500 h-full transition-all"
+              style={{ width: `${hisPercent}%` }}
+              title={`${partner1DisplayName || 'Dustin'}: ${hisNights} nights`}
+            />
+            {homePercent > 0 && (
+              <div
+                className="bg-stone-500 h-full transition-all"
+                style={{ width: `${homePercent}%` }}
+                title={`Home / Joint: ${homeNights} nights`}
+              />
+            )}
+            <div
+              className="bg-purple-600 dark:bg-purple-500 h-full transition-all"
+              style={{ width: `${herPercent}%` }}
+              title={`${partner2DisplayName || 'Katherine'}: ${herNights} nights`}
+            />
+          </div>
+          {homeNights > 0 && (
+            <p className="text-[10px] text-stone-400 dark:text-stone-500 mt-1">
+              Joint / Home: {homeNights}d
+            </p>
+          )}
         </div>
 
       </div>

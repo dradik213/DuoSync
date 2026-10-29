@@ -35,7 +35,7 @@ import {
 import { CalendarEvent, CalendarViewMode, DayStayInfo, EventCategory, EventSortOption, EventTask, PlanTemplate, SortDirection, StayLocation } from './types/calendar';
 import { INITIAL_EVENTS, MOCK_STAYS } from './data/mockEvents';
 import { INITIAL_TEMPLATES } from './data/mockTemplates';
-import { formatReadableDate, formatDateToYMD } from './utils/calendarUtils';
+import { formatReadableDate, formatDateToYMD, matchesPartnerFilter, eventOccursOnDate } from './utils/calendarUtils';
 import { Eye, Plus } from 'lucide-react';
 
 function CalendarApp() {
@@ -105,8 +105,10 @@ function CalendarApp() {
       const saved = localStorage.getItem('hub_events');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0 && parsed.some((e: CalendarEvent) => e.startDate?.startsWith('2026-11'))) {
-          return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const existingIds = new Set(parsed.map((e: CalendarEvent) => e.id));
+          const missing = INITIAL_EVENTS.filter((e) => !existingIds.has(e.id));
+          return [...parsed, ...missing];
         }
       }
     } catch (e) {}
@@ -118,8 +120,8 @@ function CalendarApp() {
       const saved = localStorage.getItem('hub_stays');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed && Object.keys(parsed).length > 0 && Object.keys(parsed).some((k) => k.startsWith('2026-11'))) {
-          return parsed;
+        if (parsed && typeof parsed === 'object') {
+          return { ...MOCK_STAYS, ...parsed };
         }
       }
     } catch (e) {}
@@ -445,14 +447,15 @@ function CalendarApp() {
       setCurrentDate(prevD);
     } else if (isWeekScope) {
       // Step back by 7 days
-      setCurrentDate((prev) => {
-        const d = new Date(prev);
-        d.setDate(d.getDate() - 7);
-        return d;
-      });
+      const d = new Date(currentDate);
+      d.setDate(d.getDate() - 7);
+      setCurrentDate(d);
+      setSelectedDate(formatDateToYMD(d));
     } else {
       // Month step
-      setCurrentDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+      const d = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+      setCurrentDate(d);
+      setSelectedDate(formatDateToYMD(d));
     }
   };
 
@@ -466,14 +469,15 @@ function CalendarApp() {
       setCurrentDate(nextD);
     } else if (isWeekScope) {
       // Step forward by 7 days
-      setCurrentDate((prev) => {
-        const d = new Date(prev);
-        d.setDate(d.getDate() + 7);
-        return d;
-      });
+      const d = new Date(currentDate);
+      d.setDate(d.getDate() + 7);
+      setCurrentDate(d);
+      setSelectedDate(formatDateToYMD(d));
     } else {
       // Month step
-      setCurrentDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+      const d = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
+      setCurrentDate(d);
+      setSelectedDate(formatDateToYMD(d));
     }
   };
 
@@ -502,14 +506,16 @@ function CalendarApp() {
     // Real-time events listener
     const unsubEvents = subscribeToEvents(currentHub.id, (remoteEvents) => {
       if (remoteEvents.length > 0) {
-        setEvents(remoteEvents);
+        const remoteIds = new Set(remoteEvents.map((e) => e.id));
+        const missing = INITIAL_EVENTS.filter((e) => !remoteIds.has(e.id));
+        setEvents([...remoteEvents, ...missing]);
       }
     });
 
     // Real-time stays listener
     const unsubStays = subscribeToStays(currentHub.id, (remoteStays) => {
       if (Object.keys(remoteStays).length > 0) {
-        setStays(remoteStays);
+        setStays({ ...MOCK_STAYS, ...remoteStays });
       }
     });
 
@@ -738,8 +744,8 @@ function CalendarApp() {
     try { localStorage.setItem('hub_templates', JSON.stringify(reordered)); } catch (e) {}
   };
 
-  // Selected date's events
-  const selectedDateEvents = events.filter((e) => e.startDate === selectedDate);
+  // Selected date's events (supports multi-day spans and partner filter)
+  const selectedDateEvents = events.filter((e) => eventOccursOnDate(e, selectedDate) && matchesPartnerFilter(e.assignedTo, partnerFilter));
   const selectedDateStay = stays[selectedDate];
 
   if (!currentUser) {

@@ -216,8 +216,8 @@ export const SelectedDaySummaryWidget: React.FC<SelectedDaySummaryWidgetProps> =
   const diffDays = Math.round((targetDateOnly.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24));
   const isWithinHorizon = dayForecast != null && diffDays >= 0 && diffDays <= 14;
 
-  // Filter events for selected day
-  const dayEvents = events.filter((e) => e.startDate === selectedDate);
+  // Filter events for selected day (supporting multi-day spans)
+  const dayEvents = events.filter((e) => e.startDate <= selectedDate && (e.endDate || e.startDate) >= selectedDate);
   const stayInfo = stays[selectedDate];
 
   // Group events by category & calculate time spent
