@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   CheckCircle2, 
   Clock, 
@@ -6,7 +6,10 @@ import {
   Home, 
   FileText,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Sparkles,
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
 import { CalendarEvent, DayStayInfo } from '../types/calendar';
 import { CATEGORY_CONFIG, formatReadableDate, formatDateToYMD } from '../utils/calendarUtils';
@@ -38,6 +41,9 @@ export const ReflectionDashboard: React.FC<ReflectionDashboardProps> = ({
   onNavigateToDay,
 }) => {
   const { partner1Label, partner2Label } = useAuth();
+  const [aiInsights, setAiInsights] = useState<string | null>(null);
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
   // Compute start/end for week
   const curr = new Date(currentDate);
   const dayOfWeek = (curr.getDay() + 6) % 7;
@@ -116,6 +122,45 @@ export const ReflectionDashboard: React.FC<ReflectionDashboardProps> = ({
     }
   });
 
+  const fetchAiReflection = async () => {
+    setIsAiLoading(true);
+    setAiError(null);
+    try {
+      const res = await fetch('/api/generate-insights', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          timeframe,
+          selectedDate,
+          events: filteredEvents.map((e) => ({
+            title: e.title,
+            category: e.category,
+            startDate: e.startDate,
+            tasks: (e.tasks || []).length,
+          })),
+          stays: stayEntries.map((s) => ({
+            date: s.date,
+            stayAt: s.stayAt,
+          })),
+        }),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to generate AI reflection insights');
+      }
+      const data = await res.json();
+      setAiInsights(data.insight || data.reflection || 'Reflection insights generated.');
+    } catch (err: any) {
+      setAiError(err.message || 'Failed to generate AI reflection insights.');
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAiReflection();
+  }, [timeframe, selectedDate]);
+
   return (
     <div className="space-y-5">
       {/* Timeframe Selector Bar: Daily / Weekly / Monthly / All Time */}
@@ -183,6 +228,52 @@ export const ReflectionDashboard: React.FC<ReflectionDashboardProps> = ({
           </button>
         </div>
       </div>
+
+      {/* AI Couple Reflection & Insights Banner */}
+      {isAiLoading && (
+        <div className="bg-[#fcfaf7] dark:bg-[#1a1d22] rounded-xl border border-[#e4ded5] dark:border-[#2d3139] p-4 shadow-2xs flex items-center justify-center gap-3 text-xs text-stone-600 dark:text-stone-300">
+          <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+          <span>Generating couple reflection & schedule insights...</span>
+        </div>
+      )}
+
+      {aiError && (
+        <div className="bg-rose-50 dark:bg-rose-950/30 rounded-xl border border-rose-200 dark:border-rose-900/50 p-4 text-xs flex items-center justify-between gap-3 text-rose-800 dark:text-rose-300">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+            <span>{aiError}</span>
+          </div>
+          <button
+            type="button"
+            onClick={fetchAiReflection}
+            className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs transition-colors shrink-0 cursor-pointer shadow-xs"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {aiInsights && !isAiLoading && !aiError && (
+        <div className="bg-purple-50/70 dark:bg-purple-950/20 rounded-xl border border-purple-200/80 dark:border-purple-900/50 p-4 shadow-2xs text-xs space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="font-semibold text-purple-900 dark:text-purple-200 flex items-center gap-1.5 font-mono uppercase tracking-wider text-[11px]">
+              <Sparkles className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+              <span>Couple Reflection & Insights</span>
+            </span>
+            <button
+              type="button"
+              onClick={fetchAiReflection}
+              className="text-[11px] font-semibold text-purple-700 dark:text-purple-300 hover:underline flex items-center gap-1 cursor-pointer"
+            >
+              <RefreshCw className="w-3 h-3" />
+              <span>Refresh</span>
+            </button>
+          </div>
+          <p className="text-stone-800 dark:text-stone-200 leading-relaxed font-sans text-xs pt-1">
+            {aiInsights}
+          </p>
+        </div>
+      )}
 
       {/* 4 Key Metrics Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

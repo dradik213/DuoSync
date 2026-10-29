@@ -23,15 +23,19 @@ export const InvitePartnerModal: React.FC<InvitePartnerModalProps> = ({ isOpen, 
   const [joinError, setJoinError] = useState<string | null>(null);
   const [isJoining, setIsJoining] = useState(false);
 
-  if (!isOpen || !currentHub || !currentUser) return null;
+  if (!isOpen || !currentUser) return null;
+
+  const hasValidHub = Boolean(currentHub?.id && currentHub?.inviteCode);
 
   const handleCopyCode = () => {
+    if (!hasValidHub || !currentHub?.inviteCode) return;
     navigator.clipboard.writeText(currentHub.inviteCode);
     setCopiedCode(true);
     setTimeout(() => setCopiedCode(false), 2000);
   };
 
   const handleCopyLink = () => {
+    if (!hasValidHub || !currentHub?.inviteCode) return;
     const link = `${window.location.origin}?hub=${currentHub.inviteCode}`;
     navigator.clipboard.writeText(link);
     setCopiedLink(true);
@@ -87,7 +91,7 @@ export const InvitePartnerModal: React.FC<InvitePartnerModalProps> = ({ isOpen, 
                 Invite Partner to Shared Hub
               </h2>
               <p className="text-xs text-stone-500 dark:text-stone-400">
-                {currentHub.name} • Active Couple View: <span className="font-semibold text-purple-600 dark:text-purple-400">{coupleViewLabel}</span>
+                {currentHub?.name || 'Shared Hub'} • Active Couple View: <span className="font-semibold text-purple-600 dark:text-purple-400">{coupleViewLabel}</span>
               </p>
             </div>
           </div>
@@ -105,29 +109,43 @@ export const InvitePartnerModal: React.FC<InvitePartnerModalProps> = ({ isOpen, 
           <p className="text-xs text-stone-600 dark:text-stone-400 font-medium">
             Share this invite code with your partner to link calendars & stays:
           </p>
-          <div className="flex items-center justify-center gap-2">
-            <div className="px-5 py-2.5 bg-white dark:bg-[#16181c] border-2 border-purple-500/60 rounded-xl font-mono text-xl sm:text-2xl font-black tracking-widest text-purple-700 dark:text-purple-300 shadow-inner">
-              {currentHub.inviteCode}
+          {!hasValidHub ? (
+            <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-200 dark:border-amber-900/40 text-xs font-semibold text-amber-800 dark:text-amber-300">
+              Create or select a hub first
             </div>
-            <button
-              type="button"
-              onClick={handleCopyCode}
-              className="p-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
-              title="Copy code"
-            >
-              {copiedCode ? <Check className="w-4 h-4 text-emerald-300" /> : <Copy className="w-4 h-4" />}
-              <span>{copiedCode ? 'Copied!' : 'Copy Code'}</span>
-            </button>
-          </div>
+          ) : (
+            <div className="flex items-center justify-center gap-2">
+              <div className="px-5 py-2.5 bg-white dark:bg-[#16181c] border-2 border-purple-500/60 rounded-xl font-mono text-xl sm:text-2xl font-black tracking-widest text-purple-700 dark:text-purple-300 shadow-inner">
+                {currentHub?.inviteCode}
+              </div>
+              <button
+                type="button"
+                onClick={handleCopyCode}
+                disabled={!hasValidHub}
+                className="p-3 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+                title="Copy code"
+              >
+                {copiedCode ? <Check className="w-4 h-4 text-emerald-300" /> : <Copy className="w-4 h-4" />}
+                <span>{copiedCode ? 'Copied!' : 'Copy Code'}</span>
+              </button>
+            </div>
+          )}
 
           <div className="pt-2">
             <button
               type="button"
               onClick={handleCopyLink}
-              className="text-xs text-stone-600 dark:text-stone-300 hover:text-purple-600 dark:hover:text-purple-400 inline-flex items-center gap-1.5 cursor-pointer font-medium"
+              disabled={!hasValidHub}
+              className="text-xs text-stone-600 dark:text-stone-300 hover:text-purple-600 dark:hover:text-purple-400 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5 cursor-pointer font-medium"
             >
               <Share2 className="w-3.5 h-3.5" />
-              <span>{copiedLink ? 'Invite Link Copied to Clipboard!' : 'Copy Invite Link with Code'}</span>
+              <span>
+                {!hasValidHub
+                  ? 'Create or select a hub first'
+                  : copiedLink
+                  ? 'Invite Link Copied to Clipboard!'
+                  : 'Copy Invite Link with Code'}
+              </span>
             </button>
           </div>
         </div>
@@ -194,7 +212,7 @@ export const InvitePartnerModal: React.FC<InvitePartnerModalProps> = ({ isOpen, 
                 No partner has joined yet with your invite code.
               </p>
               <p className="text-[11px] text-stone-400 dark:text-stone-500 mt-0.5">
-                Share code <span className="font-mono font-bold text-stone-700 dark:text-stone-300">{currentHub.inviteCode}</span> or add your partner profile directly below:
+                Share code <span className="font-mono font-bold text-stone-700 dark:text-stone-300">{currentHub?.inviteCode || 'N/A'}</span> or add your partner profile directly below:
               </p>
             </div>
           )}

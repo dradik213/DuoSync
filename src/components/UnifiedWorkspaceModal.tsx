@@ -34,9 +34,10 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
-  MapPin,
-  ChevronDown
+  ChevronDown,
+  Package
 } from 'lucide-react';
+import { InventoryManager } from './InventoryManager';
 import { CalendarEvent, EventCategory, PlanTemplate } from '../types/calendar';
 import { 
   auth,
@@ -60,6 +61,7 @@ import { subscribeToMessages, sendMessageToFirestore } from '../utils/firebaseSe
 import { CATEGORY_CONFIG, formatDateToYMD, formatReadableDate, formatTimeRange, formatUsTime } from '../utils/calendarUtils';
 
 export type UnifiedWorkspaceTab = 
+  | 'inventory'
   | 'templates' 
   | 'admin' 
   | 'gemini' 
@@ -165,7 +167,9 @@ export const UnifiedWorkspaceModal: React.FC<UnifiedWorkspaceModalProps> = ({
     partner2Label, 
     user1Theme, 
     user2Theme, 
-    updateHubName 
+    updateHubName,
+    hubs,
+    switchHub 
   } = useAuth();
 
   const [activeTab, setActiveTab] = useState<UnifiedWorkspaceTab>(initialTab);
@@ -665,8 +669,9 @@ export const UnifiedWorkspaceModal: React.FC<UnifiedWorkspaceModalProps> = ({
     chat: tabNotifications?.chat ?? unreadChatCount,
   };
 
-  // Tabs config - CHAT IS THE FINAL OPTION (Tab 7)
+  // Tabs config - CHAT IS THE FINAL OPTION
   const TABS: { id: UnifiedWorkspaceTab; label: string; icon: any; badge?: number }[] = [
+    { id: 'inventory', label: 'Inventory', icon: Package, badge: 0 },
     { id: 'templates', label: 'Templates', icon: Sliders, badge: notificationCounts.templates },
     { id: 'admin', label: 'Admin & Hub', icon: Settings, badge: notificationCounts.admin },
     { id: 'gemini', label: 'Gemini AI', icon: Sparkles, badge: notificationCounts.gemini },
@@ -774,6 +779,13 @@ export const UnifiedWorkspaceModal: React.FC<UnifiedWorkspaceModalProps> = ({
 
         {/* Modal Main Content Container */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+
+          {/* ========================================================
+              TAB: INVENTORY & BARCODES
+             ======================================================== */}
+          {activeTab === 'inventory' && (
+            <InventoryManager />
+          )}
 
           {/* ========================================================
               TAB 1: TEMPLATES
@@ -977,6 +989,30 @@ export const UnifiedWorkspaceModal: React.FC<UnifiedWorkspaceModalProps> = ({
                   <p className="text-sm font-semibold text-stone-800 dark:text-stone-200">
                     {currentHub?.name || 'Shared Life Hub'}
                   </p>
+                )}
+                {/* Active Hub Switcher: Calls AuthContext switchHub so App updates currentHub immediately */}
+                {hubs && hubs.length > 1 && (
+                  <div className="pt-2.5 border-t border-stone-200/70 dark:border-stone-800/70 flex items-center justify-between gap-3">
+                    <span className="text-xs font-semibold text-stone-700 dark:text-stone-300">
+                      Switch Active Hub:
+                    </span>
+                    <select
+                      value={currentHub?.id || ''}
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          switchHub(e.target.value);
+                          showAdminFeedback('Switched active hub.');
+                        }
+                      }}
+                      className="text-xs px-2.5 py-1.5 rounded-lg border border-[#e4ded5] dark:border-[#353943] bg-stone-50 dark:bg-[#252830] text-stone-900 dark:text-stone-100 font-semibold cursor-pointer outline-none focus:ring-1 focus:ring-purple-500"
+                    >
+                      {hubs.map((h) => (
+                        <option key={h.id} value={h.id}>
+                          {h.name} {h.id === currentHub?.id ? '(Current)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 )}
                 <p className="text-xs text-stone-500 dark:text-stone-400">
                   This hub name appears at the top left of your calendar and on shared invite links.

@@ -76,6 +76,7 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
   const [aiPrompt, setAiPrompt] = useState('');
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [timeError, setTimeError] = useState<string | null>(null);
 
   // Guarantee page starts blank whenever modal is opened
   useEffect(() => {
@@ -87,6 +88,7 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
       setStartDate(initialDate || formatDateToYMD(new Date()));
       setStartTime('');
       setEndTime('');
+      setTimeError(null);
       setLocationName('');
       setAddress('');
       setAssignedTo('both');
@@ -264,6 +266,12 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
+
+    if (startTime && endTime && endTime <= startTime) {
+      setTimeError('End time must be after start time');
+      return;
+    }
+    setTimeError(null);
 
     const initialTasks: EventTask[] = taskInputs
       .filter((t) => t.trim().length > 0)
@@ -534,7 +542,10 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
               <input
                 type="time"
                 value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
+                onChange={(e) => {
+                  setStartTime(e.target.value);
+                  if (timeError) setTimeError(null);
+                }}
                 className="w-full text-xs px-2.5 py-2 rounded-lg border border-[#e4ded5] dark:border-[#353943] bg-white dark:bg-[#1a1d22] text-stone-800 dark:text-stone-200 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-100 font-mono"
               />
             </div>
@@ -545,11 +556,19 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
               <input
                 type="time"
                 value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
+                onChange={(e) => {
+                  setEndTime(e.target.value);
+                  if (timeError) setTimeError(null);
+                }}
                 className="w-full text-xs px-2.5 py-2 rounded-lg border border-[#e4ded5] dark:border-[#353943] bg-white dark:bg-[#1a1d22] text-stone-800 dark:text-stone-200 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-100 font-mono"
               />
             </div>
           </div>
+          {timeError && (
+            <div className="p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 text-xs font-semibold text-rose-600 dark:text-rose-400">
+              {timeError}
+            </div>
+          )}
 
           {/* Lead Selector: Hers / His / Both */}
           <div>
@@ -753,6 +772,10 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
                   />
                 </div>
               </div>
+              <div className="pt-1 border-t border-amber-200 dark:border-amber-900/40 text-[11px] text-amber-900 dark:text-amber-200 font-medium flex items-center justify-between">
+                <span>📦 Barcode Packout & POS Register buttons will be ready on this market card.</span>
+                <span className="text-[10px] text-amber-700 dark:text-amber-400 font-mono">Heart &gt; Inventory for barcodes</span>
+              </div>
             </div>
           )}
 
@@ -771,20 +794,29 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
           </div>
 
           {/* Footer Submit */}
-          <div className="pt-3 border-t border-[#e4ded5] dark:border-[#2d3139] flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3.5 py-1.5 text-xs font-medium text-stone-600 dark:text-stone-400 hover:text-stone-900 rounded-lg cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-1.5 text-xs font-semibold bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 hover:bg-stone-800 rounded-lg shadow-sm transition-colors cursor-pointer"
-            >
-              Add Activity
-            </button>
+          <div className="pt-3 border-t border-[#e4ded5] dark:border-[#2d3139] flex items-center justify-between gap-2">
+            <div>
+              {timeError && (
+                <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">
+                  {timeError}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-3.5 py-1.5 text-xs font-medium text-stone-600 dark:text-stone-400 hover:text-stone-900 rounded-lg cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-1.5 text-xs font-semibold bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 hover:bg-stone-800 rounded-lg shadow-sm transition-colors cursor-pointer"
+              >
+                Add Activity
+              </button>
+            </div>
           </div>
         </form>
       </div>

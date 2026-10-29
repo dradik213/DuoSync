@@ -46,6 +46,8 @@ interface AuthContextType {
   updateHubName: (name: string) => void;
   addPartnerToHub: (partnerData: { name: string; email: string; gender: UserGender }) => void;
   clearAllHubData: () => void;
+  hubs: SharedHub[];
+  switchHub: (hubId: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -91,17 +93,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const saved = localStorage.getItem(USERS_STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          // Filter out obsolete testing accounts
-          return parsed.filter(
-            (u: UserAccount) =>
-              u.email.toLowerCase() !== 'admin@duosync.app' &&
-              u.email.toLowerCase() !== 'alex@duosync.app'
-          );
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const list = [...parsed];
+          if (!list.some((u: UserAccount) => u.email.toLowerCase() === DEFAULT_ADMIN_USER.email.toLowerCase())) {
+            list.push(DEFAULT_ADMIN_USER);
+          }
+          if (!list.some((u: UserAccount) => u.email.toLowerCase() === DEFAULT_PARTNER_USER.email.toLowerCase())) {
+            list.push(DEFAULT_PARTNER_USER);
+          }
+          return list;
         }
       }
     } catch (e) {}
-    return [];
+    return [DEFAULT_ADMIN_USER, DEFAULT_PARTNER_USER];
   });
 
   const [hubs, setHubs] = useState<SharedHub[]>(() => {
@@ -109,24 +113,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const saved = localStorage.getItem(HUBS_STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return parsed.filter((h: SharedHub) => h.id !== 'hub-admin-default');
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const list = [...parsed];
+          if (!list.some((h: SharedHub) => h.id === DEFAULT_ADMIN_HUB.id)) {
+            list.push(DEFAULT_ADMIN_HUB);
+          }
+          return list;
         }
       }
     } catch (e) {}
-    return [];
+    return [DEFAULT_ADMIN_HUB];
   });
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(() => {
     try {
       const id = localStorage.getItem(CURRENT_USER_KEY);
-      if (id === 'usr-admin-001' || id === 'usr-admin-partner-002') {
-        localStorage.removeItem(CURRENT_USER_KEY);
-        return null;
-      }
-      return id;
+      return id || DEFAULT_ADMIN_USER.id;
     } catch (e) {
-      return null;
+      return DEFAULT_ADMIN_USER.id;
     }
   });
 
@@ -484,9 +488,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const updateProfile = (updates: Partial<UserAccount>) => {
     if (!currentUser) return;
     const updatedUser = { ...currentUser, ...updates };
-    setUsers((prev) => prev.map((u) => (u.id === currentUser.id ? updatedUser : u)));
-    setHubs((prev) =>
-      prev.map((h) => {
+    setUsers((prev) => {
+      const newUsers = prev.map((u) => (u.id === currentUser.id ? updatedUser : u));
+      try {
+        localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(newUsers));
+      } catch (e) {}
+      return newUsers;
+    });
+    setHubs((prev) => {
+      const newHubs = prev.map((h) => {
         if (h.id === currentUser.hubId) {
           return {
             ...h,
@@ -494,8 +504,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           };
         }
         return h;
-      })
-    );
+      });
+      try {
+        localStorage.setItem(HUBS_STORAGE_KEY, JSON.stringify(newHubs));
+      } catch (e) {}
+      return newHubs;
+    });
     try {
       saveUserToFirestore(updatedUser).catch((err) => {
         console.warn('Failed to save user profile in Firestore:', err);
@@ -562,6 +576,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (e) {}
   };
 
+  const switchHub = (hubId: string) => {
+    if (!currentUser) return;
+    const targetHub = hubs.find((h) => h.id === hubId);
+    if (!targetHub) return;
+    const updatedUser: UserAccount = { ...currentUser, hubId: targetHub.id };
+    setUsers((prev) => {
+      const next = prev.map((u) => (u.id === currentUser.id ? updatedUser : u));
+      try {
+        localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -589,6 +617,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         updateHubName,
         addPartnerToHub,
         clearAllHubData,
+        hubs,
+        switchHub,
       }}
     >
       {children}

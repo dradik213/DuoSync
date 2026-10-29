@@ -37,9 +37,52 @@ export interface CalendarEvent {
     boothNumber?: string;
     targetRevenue?: number;
     actualRevenue?: number;
+    inventory?: MarketPackoutItem[];
+    sales?: MarketSaleRecord[];
   };
   photoCount?: number;
   photos?: string[];
+}
+
+export interface InventoryProduct {
+  id: string;
+  name: string;
+  sku: string;
+  barcode: string;
+  category: string;
+  price: number;
+  cost?: number;
+  defaultStock: number;
+  description?: string;
+  createdAt: string;
+}
+
+export interface MarketPackoutItem {
+  productId: string;
+  name: string;
+  barcode: string;
+  price: number;
+  category: string;
+  quantityPacked: number;
+  quantitySold: number;
+}
+
+export interface MarketSaleRecord {
+  id: string;
+  timestamp: string;
+  items: Array<{
+    productId: string;
+    name: string;
+    quantity: number;
+    unitPrice: number;
+  }>;
+  subtotal: number;
+  tax: number;
+  total: number;
+  paymentMethod: 'cash' | 'card' | 'venmo';
+  cashTendered?: number;
+  changeDue?: number;
+  customerNote?: string;
 }
 
 export type CalendarViewMode = 'month' | 'week' | 'agenda' | 'reflection' | 'admin';

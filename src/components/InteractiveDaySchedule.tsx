@@ -21,14 +21,18 @@ import {
   UtensilsCrossed,
   Wrench,
   Luggage,
-  ShoppingCart
+  ShoppingCart,
+  Barcode,
+  ShoppingBag
 } from 'lucide-react';
-import { CalendarEvent, DayStayInfo, EventCategory, EventSortOption, EventTask, SortDirection, StayLocation } from '../types/calendar';
+import { CalendarEvent, DayStayInfo, EventCategory, EventSortOption, EventTask, MarketPackoutItem, MarketSaleRecord, SortDirection, StayLocation } from '../types/calendar';
 import { CATEGORY_CONFIG, formatReadableDate, sortEventsForDay, formatTimeRange, formatUsTime, formatDateToYMD } from '../utils/calendarUtils';
 import { getMoonPhase } from '../utils/astronomyUtils';
 import { TaskToggleSlider } from './TaskToggleSlider';
 import { useAuth } from '../context/AuthContext';
 import { GoogleTaskItem } from '../utils/googleWorkspace';
+import { MarketPackoutModal } from './MarketPackoutModal';
+import { PointOfSaleRegisterModal } from './PointOfSaleRegisterModal';
 
 interface InteractiveDayScheduleProps {
   currentDate?: Date;
@@ -95,6 +99,8 @@ export const InteractiveDaySchedule: React.FC<InteractiveDayScheduleProps> = ({
   
   // State for Editing Event Details
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
+  const [packoutEvent, setPackoutEvent] = useState<CalendarEvent | null>(null);
+  const [posEvent, setPosEvent] = useState<CalendarEvent | null>(null);
   const [showRolloverDrawer, setShowRolloverDrawer] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
 
@@ -116,6 +122,116 @@ export const InteractiveDaySchedule: React.FC<InteractiveDayScheduleProps> = ({
     });
 
   const dayEvents = sortEventsForDay(filteredDayEvents, sortOption, sortDirection);
+
+  // Group overlapping events in the same time range into columns for side-by-side rendering
+  const eventClusters = React.useMemo(() => {
+    if (dayEvents.length === 0) return [];
+
+    const parseTimeToMinutes = (t?: string): number | null => {
+      if (!t) return null;
+      const [h, m] = t.split(':').map(Number);
+      if (isNaN(h) || isNaN(m)) return null;
+      return h * 60 + m;
+    };
+
+    const timedWithRange: Array<{
+      evt: CalendarEvent;
+      start: number;
+      end: number;
+    }> = [];
+    const untimed: CalendarEvent[] = [];
+
+    dayEvents.forEach((evt) => {
+      const s = parseTimeToMinutes(evt.startTime);
+      if (s !== null) {
+        let e = parseTimeToMinutes(evt.endTime);
+        if (e === null || e <= s) {
+          e = s + 60;
+        }
+        timedWithRange.push({ evt, start: s, end: e });
+      } else {
+        untimed.push(evt);
+      }
+    });
+
+    timedWithRange.sort((a, b) => a.start - b.start || (b.end - b.start) - (a.end - a.start));
+
+    const clusters: Array<Array<{ evt: CalendarEvent; start: number; end: number }>> = [];
+    let currentCluster: Array<{ evt: CalendarEvent; start: number; end: number }> = [];
+    let currentClusterEnd = -1;
+
+    timedWithRange.forEach((item) => {
+      if (currentCluster.length === 0) {
+        currentCluster.push(item);
+        currentClusterEnd = item.end;
+      } else if (item.start < currentClusterEnd) {
+        currentCluster.push(item);
+        currentClusterEnd = Math.max(currentClusterEnd, item.end);
+      } else {
+        clusters.push(currentCluster);
+        currentCluster = [item];
+        currentClusterEnd = item.end;
+      }
+    });
+    if (currentCluster.length > 0) {
+      clusters.push(currentCluster);
+    }
+
+    const result: Array<{
+      id: string;
+      items: Array<{
+        evt: CalendarEvent;
+        columnIndex: number;
+        totalColumns: number;
+      }>;
+    }> = [];
+
+    clusters.forEach((cluster, clusterIdx) => {
+      const colEndTimes: number[] = [];
+      const assignedItems: Array<{
+        evt: CalendarEvent;
+        columnIndex: number;
+        totalColumns: number;
+      }> = [];
+
+      cluster.forEach(({ evt, start, end }) => {
+        let col = 0;
+        while (col < colEndTimes.length && colEndTimes[col] > start) {
+          col++;
+        }
+        if (col < colEndTimes.length) {
+          colEndTimes[col] = end;
+        } else {
+          colEndTimes.push(end);
+        }
+        assignedItems.push({
+          evt,
+          columnIndex: col,
+          totalColumns: 1,
+        });
+      });
+
+      const totalCols = Math.max(1, colEndTimes.length);
+      const finalItems = assignedItems.map((item) => ({
+        ...item,
+        totalColumns: totalCols,
+      }));
+
+      result.push({
+        id: `cluster-timed-${clusterIdx}-${cluster[0].evt.id}`,
+        items: finalItems,
+      });
+    });
+
+    untimed.forEach((evt, uIdx) => {
+      result.push({
+        id: `cluster-untimed-${uIdx}-${evt.id}`,
+        items: [{ evt, columnIndex: 0, totalColumns: 1 }],
+      });
+    });
+
+    return result;
+  }, [dayEvents]);
 
   // Ensure first event is expanded by default on day change
   useEffect(() => {
@@ -244,6 +360,40 @@ export const InteractiveDaySchedule: React.FC<InteractiveDayScheduleProps> = ({
     if (editingEvent && onUpdateEvent) {
       onUpdateEvent(editingEvent);
       setEditingEvent(null);
+    }
+  };
+
+  const handleSavePackout = (eventId: string, updatedInventory: MarketPackoutItem[]) => {
+    const target = allEvents.find((e) => e.id === eventId);
+    if (target && onUpdateEvent) {
+      onUpdateEvent({
+        ...target,
+        marketDetails: {
+          ...target.marketDetails,
+          inventory: updatedInventory
+        }
+      });
+    }
+  };
+
+  const handleCompleteSale = (
+    eventId: string,
+    sale: MarketSaleRecord,
+    updatedRevenue: number,
+    updatedInventory?: MarketPackoutItem[]
+  ) => {
+    const target = allEvents.find((e) => e.id === eventId);
+    if (target && onUpdateEvent) {
+      const prevSales = target.marketDetails?.sales || [];
+      onUpdateEvent({
+        ...target,
+        marketDetails: {
+          ...target.marketDetails,
+          actualRevenue: updatedRevenue,
+          sales: [sale, ...prevSales],
+          inventory: updatedInventory || target.marketDetails?.inventory
+        }
+      });
     }
   };
 
@@ -435,24 +585,36 @@ export const InteractiveDaySchedule: React.FC<InteractiveDayScheduleProps> = ({
           )}
         </div>
       ) : (
-        <div className="space-y-3.5">
-          {dayEvents.map((evt, idx) => {
-            const cfg = CATEGORY_CONFIG[evt.category];
-            const tasks = evt.tasks || [];
-            const completedCount = tasks.filter((t) => t.completed).length;
-            const isExpanded = expandedEventIds[evt.id] !== false; // default open
-            const partnerLabel = evt.assignedTo === 'her' ? partner1Label : evt.assignedTo === 'him' ? partner2Label : 'Both';
-            const allTasksDone = tasks.length > 0 && completedCount === tasks.length;
-            const isLastEvent = idx === dayEvents.length - 1;
-
+        <div className="space-y-3.5 relative">
+          {eventClusters.map((cluster) => {
+            const hasMultiple = cluster.items.length > 1;
             return (
               <div
-                key={evt.id}
-                className={`rounded-xl border transition-all shadow-xs overflow-hidden ${cfg.badgeBg} ${cfg.borderColor}`}
+                key={cluster.id}
+                className={hasMultiple ? 'relative w-full min-h-[140px]' : 'relative w-full'}
               >
-                {/* Event Card Header - Click to minimize / expand */}
-                <div
-                  onClick={() => toggleEventExpanded(evt.id)}
+                {cluster.items.map(({ evt, columnIndex, totalColumns }) => {
+                  const cfg = CATEGORY_CONFIG[evt.category];
+                  const tasks = evt.tasks || [];
+                  const completedCount = tasks.filter((t) => t.completed).length;
+                  const isExpanded = expandedEventIds[evt.id] !== false; // default open
+                  const partnerLabel = evt.assignedTo === 'her' ? partner1Label : evt.assignedTo === 'him' ? partner2Label : 'Both';
+                  const allTasksDone = tasks.length > 0 && completedCount === tasks.length;
+
+                  return (
+                    <div
+                      key={evt.id}
+                      style={{
+                        width: `calc((100% - 4rem) / ${totalColumns})`,
+                        left: `calc(3.5rem + (${columnIndex} * (100% - 4rem) / ${totalColumns}))`,
+                      }}
+                      className={`rounded-xl border transition-all shadow-xs overflow-hidden ${cfg.badgeBg} ${cfg.borderColor} ${
+                        hasMultiple && columnIndex > 0 ? 'absolute top-0' : 'relative'
+                      }`}
+                    >
+                      {/* Event Card Header - Click to minimize / expand */}
+                      <div
+                        onClick={() => toggleEventExpanded(evt.id)}
                   className="p-3.5 sm:p-4 flex items-start justify-between gap-3 cursor-pointer select-none hover:opacity-95 transition-opacity"
                 >
                   <div className="min-w-0 flex-1">
@@ -533,20 +695,71 @@ export const InteractiveDaySchedule: React.FC<InteractiveDayScheduleProps> = ({
                       </div>
                     )}
 
-                    {/* Pop-Up Market Details if applicable */}
-                    {evt.marketDetails && (
-                      <div className="grid grid-cols-3 gap-2 p-3 rounded-lg bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-xs font-mono">
-                        <div>
-                          <span className="text-[10px] text-amber-800 dark:text-amber-300 font-sans block">Booth Stall</span>
-                          <span className="font-bold text-stone-900 dark:text-stone-100">{evt.marketDetails.boothNumber || 'Assigned'}</span>
+                    {/* Pop-Up Market Details, Packout Inventory & Register Actions */}
+                    {(evt.category === 'market' || evt.marketDetails) && (
+                      <div className="rounded-xl bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 p-3.5 space-y-3">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
+                          <div>
+                            <span className="text-[10px] text-amber-800 dark:text-amber-300 font-sans block">Booth Stall</span>
+                            <span className="font-bold text-stone-900 dark:text-stone-100">{evt.marketDetails?.boothNumber || 'Assigned'}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-amber-800 dark:text-amber-300 font-sans block">Booth Fee</span>
+                            <span className="font-bold text-stone-900 dark:text-stone-100">${evt.marketDetails?.boothFee || 0}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-amber-800 dark:text-amber-300 font-sans block">Target Sales</span>
+                            <span className="font-bold text-stone-900 dark:text-stone-100">${evt.marketDetails?.targetRevenue || 0}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-amber-800 dark:text-amber-300 font-sans block">Actual Sales</span>
+                            <span className="font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                              ${(evt.marketDetails?.actualRevenue || 0).toFixed(2)}
+                            </span>
+                          </div>
                         </div>
-                        <div>
-                          <span className="text-[10px] text-amber-800 dark:text-amber-300 font-sans block">Registration Fee</span>
-                          <span className="font-bold text-stone-900 dark:text-stone-100">${evt.marketDetails.boothFee || 0}</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-amber-800 dark:text-amber-300 font-sans block">Target Sales</span>
-                          <span className="font-bold text-emerald-700 dark:text-emerald-400">${evt.marketDetails.targetRevenue || 0}</span>
+
+                        {/* Market Action Bar: [Inventory] and [Register] Buttons */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-amber-200/80 dark:border-amber-900/40">
+                          <div className="text-[11px] text-amber-900 dark:text-amber-200 font-medium">
+                            {evt.marketDetails?.inventory && evt.marketDetails.inventory.length > 0 ? (
+                              <span>
+                                📦 <strong>{evt.marketDetails.inventory.reduce((a, b) => a + b.quantityPacked, 0)} items packed</strong> (${evt.marketDetails.inventory.reduce((a, b) => a + (b.quantityPacked * b.price), 0).toFixed(2)})
+                              </span>
+                            ) : (
+                              <span className="text-amber-700/80 dark:text-amber-400/80 italic text-[11px]">
+                                No items logged for this market yet.
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPackoutEvent(evt);
+                              }}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white dark:bg-[#1a1d22] hover:bg-amber-100/60 dark:hover:bg-[#252830] border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+                              title="Scan barcodes to log items brought to this market"
+                            >
+                              <Barcode className="w-3.5 h-3.5 text-amber-700" />
+                              <span>Inventory</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPosEvent(evt);
+                              }}
+                              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-colors cursor-pointer shadow-xs"
+                              title="Open Point of Sale register (scan barcodes, cash, card scanner, Venmo QR)"
+                            >
+                              <ShoppingBag className="w-3.5 h-3.5" />
+                              <span>Register</span>
+                            </button>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -662,6 +875,9 @@ export const InteractiveDaySchedule: React.FC<InteractiveDayScheduleProps> = ({
 
                   </div>
                 )}
+              </div>
+            );
+          })}
               </div>
             );
           })}
@@ -937,6 +1153,26 @@ export const InteractiveDaySchedule: React.FC<InteractiveDayScheduleProps> = ({
             </form>
           </div>
         </div>
+      )}
+
+      {/* Market Packout Modal */}
+      {packoutEvent && (
+        <MarketPackoutModal
+          event={packoutEvent}
+          isOpen={true}
+          onClose={() => setPackoutEvent(null)}
+          onSavePackout={handleSavePackout}
+        />
+      )}
+
+      {/* Point of Sale Register Modal */}
+      {posEvent && (
+        <PointOfSaleRegisterModal
+          event={posEvent}
+          isOpen={true}
+          onClose={() => setPosEvent(null)}
+          onCompleteSale={handleCompleteSale}
+        />
       )}
 
     </div>

@@ -10,14 +10,17 @@ import {
   Copy,
   Trash2,
   Minimize2,
-  X
+  X,
+  Barcode,
+  ShoppingBag
 } from 'lucide-react';
-import { CalendarEvent, DayStayInfo, EventCategory, EventSortOption, EventTask, SortDirection, StayLocation } from '../types/calendar';
+import { CalendarEvent, DayStayInfo, EventCategory, EventSortOption, EventTask, MarketPackoutItem, MarketSaleRecord, SortDirection, StayLocation } from '../types/calendar';
 import { CATEGORY_CONFIG, formatReadableDate, sortEventsForDay, formatTimeRange, formatDateToYMD } from '../utils/calendarUtils';
-import { getMoonPhase } from '../utils/astronomyUtils';
 import { TaskToggleSlider } from './TaskToggleSlider';
 import { useAuth } from '../context/AuthContext';
 import { GoogleTaskItem } from '../utils/googleWorkspace';
+import { MarketPackoutModal } from './MarketPackoutModal';
+import { PointOfSaleRegisterModal } from './PointOfSaleRegisterModal';
 
 interface DayInspectorProps {
   selectedDate: string;
@@ -32,6 +35,7 @@ interface DayInspectorProps {
   onAddTaskToEvent: (eventId: string, taskTitle: string, assignedTo?: 'both' | 'him' | 'her') => void;
   onDeleteTaskFromEvent: (eventId: string, taskId: string) => void;
   onCopyTaskToDate: (sourceTaskTitle: string, targetDate: string, assignedTo?: 'both' | 'him' | 'her') => void;
+  onUpdateEvent?: (updatedEvent: CalendarEvent) => void;
   onDeleteEvent?: (eventId: string) => void;
   onOpenFridgePhotos: () => void;
   sortOption?: EventSortOption;
@@ -51,28 +55,74 @@ export const DayInspector: React.FC<DayInspectorProps> = ({
   onAddTaskToEvent,
   onDeleteTaskFromEvent,
   onCopyTaskToDate,
+  onUpdateEvent,
   onDeleteEvent,
   onOpenFridgePhotos,
   sortOption = 'time',
   sortDirection = 'none',
 }) => {
-  const { partner1Label, partner2Label, user1Theme, user2Theme } = useAuth();
+  const { 
+    partner1Label, 
+    partner2Label, 
+    partner1Initial, 
+    partner2Initial, 
+    partner1DisplayName, 
+    partner2DisplayName, 
+    user1Theme, 
+    user2Theme 
+  } = useAuth();
   const [showRolloverDrawer, setShowRolloverDrawer] = useState(false);
   const [dayNotes, setDayNotes] = useState(stayInfo?.notes || '');
   const [newTaskInputs, setNewTaskInputs] = useState<Record<string, string>>({});
+  const [packoutEvent, setPackoutEvent] = useState<CalendarEvent | null>(null);
+  const [posEvent, setPosEvent] = useState<CalendarEvent | null>(null);
+
+  const handleSavePackout = (eventId: string, updatedInventory: MarketPackoutItem[]) => {
+    const target = allEvents.find((e) => e.id === eventId);
+    if (target && onUpdateEvent) {
+      onUpdateEvent({
+        ...target,
+        marketDetails: {
+          ...target.marketDetails,
+          inventory: updatedInventory
+        }
+      });
+    }
+  };
+
+  const handleCompleteSale = (
+    eventId: string,
+    sale: MarketSaleRecord,
+    updatedRevenue: number,
+    updatedInventory?: MarketPackoutItem[]
+  ) => {
+    const target = allEvents.find((e) => e.id === eventId);
+    if (target && onUpdateEvent) {
+      const prevSales = target.marketDetails?.sales || [];
+      onUpdateEvent({
+        ...target,
+        marketDetails: {
+          ...target.marketDetails,
+          actualRevenue: updatedRevenue,
+          sales: [sale, ...prevSales],
+          inventory: updatedInventory || target.marketDetails?.inventory
+        }
+      });
+    }
+  };
 
   // Fix: Sync dayNotes whenever selectedDate changes so notes don't stick to every day!
   useEffect(() => {
     setDayNotes(stayInfo?.notes || '');
   }, [selectedDate, stayInfo?.notes]);
 
-  // Format date
+  // Format date cleanly without repeating day-of-week already shown in top bar
   const [y, m, d] = selectedDate.split('-').map(Number);
   const dateObj = new Date(y, m - 1, d);
-  const fullDateLabel = dateObj.toLocaleDateString('en-US', {
-    weekday: 'long',
+  const dateHeading = dateObj.toLocaleDateString('en-US', {
     month: 'short',
-    day: 'numeric'
+    day: 'numeric',
+    year: 'numeric'
   });
 
   // Dynamic photo count for active hub
@@ -173,94 +223,90 @@ export const DayInspector: React.FC<DayInspectorProps> = ({
     }
   };
 
-  const [dy, dm, dd] = selectedDate.split('-').map(Number);
-  const moon = getMoonPhase(new Date(dy, dm - 1, dd, 12, 0, 0));
-
   return (
     <div className="bg-[#fcfaf7] dark:bg-[#1a1d22] rounded-xl border border-[#e4ded5] dark:border-[#2d3139] shadow-md overflow-hidden flex flex-col h-full transition-colors">
       
-      {/* Header Bar */}
-      <div className="px-4 py-3 border-b border-[#e4ded5] dark:border-[#2d3139] bg-[#f5f1e8] dark:bg-[#202329] flex items-center justify-between">
+      {/* Header Bar - tight, streamlined spacing without redundant moon mention */}
+      <div className="px-3.5 py-2.5 border-b border-[#e4ded5] dark:border-[#2d3139] bg-[#f5f1e8] dark:bg-[#202329] flex items-center justify-between">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h2 className="text-base font-serif font-bold text-stone-900 dark:text-stone-100 truncate">
-              {fullDateLabel}
+            <h2 className="text-sm sm:text-base font-serif font-bold text-stone-900 dark:text-stone-100 truncate">
+              {dateHeading}
             </h2>
-            <span
-              title={`${moon.name} (${moon.illumination}% lit) · ${moon.quoteTip}`}
-              className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100/70 dark:bg-indigo-950/40 text-indigo-800 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-900/50 cursor-help select-none shrink-0"
-            >
-              <span>{moon.emoji}</span>
-              <span className="hidden sm:inline">{moon.name}</span>
-            </span>
           </div>
-          <span className="text-[11px] text-stone-500 dark:text-stone-400">
-            {dayEvents.length} events planned
+          <span className="text-[11px] text-stone-500 dark:text-stone-400 block mt-0.5">
+            {dayEvents.length} {dayEvents.length === 1 ? 'event' : 'events'} planned
           </span>
         </div>
 
         <div className="flex items-center gap-1.5">
-          {/* Photo Button */}
+          {/* Photo Button: compact icon-only without redundant text */}
           <button
             type="button"
             onClick={onOpenFridgePhotos}
-            className="inline-flex items-center gap-1 text-[11px] font-medium bg-white dark:bg-[#282c34] hover:bg-stone-100 dark:hover:bg-[#313640] text-stone-700 dark:text-stone-200 px-2.5 py-1.2 rounded-lg border border-[#e2ddd5] dark:border-[#353943] shadow-2xs transition-colors cursor-pointer"
-            title="Photos & Mementos"
+            className="relative p-1.5 rounded-lg bg-white dark:bg-[#282c34] hover:bg-stone-100 dark:hover:bg-[#313640] text-stone-700 dark:text-stone-200 border border-[#e2ddd5] dark:border-[#353943] shadow-2xs transition-colors cursor-pointer"
+            title={`Fridge Photos${photoCount > 0 ? ` (${photoCount})` : ''}`}
+            aria-label={`Fridge Photos${photoCount > 0 ? ` (${photoCount})` : ''}`}
           >
-            <Camera className="w-3 h-3 text-stone-500 dark:text-stone-400" />
-            <span>Photos {photoCount > 0 ? `(${photoCount})` : ''}</span>
+            <Camera className="w-3.5 h-3.5 text-stone-600 dark:text-stone-400" />
+            {photoCount > 0 && (
+              <span className="absolute -top-1 -right-1 flex min-w-[14px] h-[14px] px-0.5 items-center justify-center rounded-full bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 text-[9px] font-bold shadow-xs">
+                {photoCount}
+              </span>
+            )}
           </button>
 
           {/* Quick Collapse Button */}
           <button
             type="button"
             onClick={onClose}
-            className="text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 p-1 rounded-lg hover:bg-stone-200/60 dark:hover:bg-[#2c3039] transition-colors cursor-pointer"
+            className="text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 p-1.5 rounded-lg hover:bg-stone-200/60 dark:hover:bg-[#2c3039] transition-colors cursor-pointer"
             title="Collapse Details & Expand Calendar"
           >
-            <Minimize2 className="w-4 h-4" />
+            <Minimize2 className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
-      <div className="p-4 overflow-y-auto space-y-4 flex-1">
+      <div className="p-3 overflow-y-auto space-y-3 flex-1">
         
-        {/* Overnight Stay Slider: Hers / His / Home (meaning our own home), matching view filter */}
-        <div className="flex items-center justify-between bg-[#f5f1e8]/60 dark:bg-[#202329] px-3 py-2 rounded-lg border border-[#e4ded5] dark:border-[#2d3139] text-xs">
-          <span className="text-stone-600 dark:text-stone-300 font-medium flex items-center gap-1.5 shrink-0">
+        {/* Overnight Stay Selector with 3-position initials slider and center Home (compact, no redundant spacing) */}
+        <div className="flex items-center justify-between bg-[#f5f1e8] dark:bg-[#202329] px-2.5 py-1.5 rounded-lg border border-[#e4ded5] dark:border-[#2d3139] text-xs">
+          <div className="flex items-center gap-1.5 text-stone-600 dark:text-stone-300 font-medium">
             <Home className="w-3.5 h-3.5 text-stone-500 dark:text-stone-400" />
-            <span>Stay:</span>
-          </span>
+            <span className="text-[11px]">Stay:</span>
+          </div>
           
-          <div className="flex items-center gap-1.5 bg-[#f5f1e8] dark:bg-[#202329] px-2 py-1 rounded-lg border border-[#e4ded5] dark:border-[#2d3139] shadow-2xs">
-            {/* Button 1: partner1Label */}
+          <div className="flex items-center gap-1.5 bg-[#ede8df]/70 dark:bg-[#1a1d22] px-2 py-0.5 rounded-md border border-[#e4ded5] dark:border-[#2d3139]">
+            {/* Left Partner Initial */}
             <button
               type="button"
-              onClick={() => onUpdateStay(selectedDate, 'her_home')}
-              className={`text-[11px] font-semibold transition-colors cursor-pointer px-1.5 py-0.5 rounded ${
+              onClick={() => onUpdateStay(selectedDate, currentStay === 'her_home' ? 'our_home' : 'her_home')}
+              className={`w-5 h-5 flex items-center justify-center text-[11px] font-bold rounded-md transition-all cursor-pointer ${
                 currentStay === 'her_home'
-                  ? `${user1Theme.activeText} ${user1Theme.activeBg}`
-                  : `text-stone-500 dark:text-stone-400 ${user1Theme.hoverText}`
+                  ? `${user1Theme.activeText} ${user1Theme.activeBg} ring-1 ring-stone-400/40 dark:ring-stone-500/40 shadow-xs`
+                  : `text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-200/60 dark:hover:bg-stone-700/60`
               }`}
-              title={`Stay at ${partner1Label}`}
+              title={`Stay at ${partner1DisplayName}'s (click again for Home)`}
+              aria-label={`Stay at ${partner1DisplayName}'s`}
             >
-              {partner1Label}
+              {partner1Initial}
             </button>
 
-            {/* 3-Position Slider Switch Toggle */}
+            {/* 3-Position Slider Switch: Left=Partner 1 Initial, Center=Home, Right=Partner 2 Initial */}
             <button
               type="button"
               role="switch"
-              aria-label="Toggle overnight stay"
+              aria-label={`Overnight stay: ${currentStay === 'our_home' ? 'Home (Center)' : currentStay === 'her_home' ? partner1DisplayName : partner2DisplayName}`}
               onClick={handleCycleStay}
-              className={`relative inline-flex h-5 w-11 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${
+              className={`relative inline-flex h-5 w-12 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${
                 currentStay === 'her_home'
                   ? user1Theme.sliderTrack
                   : currentStay === 'his_home'
                   ? user2Theme.sliderTrack
-                  : 'bg-black dark:bg-stone-900 border border-stone-800'
+                  : 'bg-stone-700 dark:bg-stone-600 ring-1 ring-stone-500/50'
               }`}
-              title={`Current Stay: ${currentStay === 'her_home' ? partner1Label : currentStay === 'his_home' ? partner2Label : 'Home (Our own home)'} (Click to cycle)`}
+              title={`Current Stay: ${currentStay === 'our_home' ? 'Home (Center)' : currentStay === 'her_home' ? partner1DisplayName : partner2DisplayName} (Click to cycle)`}
             >
               <span
                 aria-hidden="true"
@@ -268,38 +314,25 @@ export const DayInspector: React.FC<DayInspectorProps> = ({
                   currentStay === 'her_home'
                     ? 'translate-x-0.5'
                     : currentStay === 'his_home'
-                    ? 'translate-x-6'
-                    : 'translate-x-3.25'
+                    ? 'translate-x-[30px]'
+                    : 'translate-x-[16px] ring-1 ring-stone-400/50'
                 }`}
               />
             </button>
 
-            {/* Button 2: partner2Label */}
+            {/* Right Partner Initial */}
             <button
               type="button"
-              onClick={() => onUpdateStay(selectedDate, 'his_home')}
-              className={`text-[11px] font-semibold transition-colors cursor-pointer px-1.5 py-0.5 rounded ${
+              onClick={() => onUpdateStay(selectedDate, currentStay === 'his_home' ? 'our_home' : 'his_home')}
+              className={`w-5 h-5 flex items-center justify-center text-[11px] font-bold rounded-md transition-all cursor-pointer ${
                 currentStay === 'his_home'
-                  ? `${user2Theme.activeText} ${user2Theme.activeBg}`
-                  : `text-stone-500 dark:text-stone-400 ${user2Theme.hoverText}`
+                  ? `${user2Theme.activeText} ${user2Theme.activeBg} ring-1 ring-stone-400/40 dark:ring-stone-500/40 shadow-xs`
+                  : `text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-200/60 dark:hover:bg-stone-700/60`
               }`}
-              title={`Stay at ${partner2Label}`}
+              title={`Stay at ${partner2DisplayName}'s (click again for Home)`}
+              aria-label={`Stay at ${partner2DisplayName}'s`}
             >
-              {partner2Label}
-            </button>
-
-            {/* Button 3: Home (meaning our own home) - solid black when active */}
-            <button
-              type="button"
-              onClick={() => onUpdateStay(selectedDate, 'our_home')}
-              className={`text-[10px] font-semibold px-2 py-0.5 rounded transition-all cursor-pointer ${
-                currentStay === 'our_home'
-                  ? 'bg-black text-white dark:bg-stone-900 dark:text-white shadow-2xs font-bold'
-                  : 'text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200'
-              }`}
-              title="Our own home"
-            >
-              Home
+              {partner2Initial}
             </button>
           </div>
         </div>
@@ -476,6 +509,50 @@ export const DayInspector: React.FC<DayInspectorProps> = ({
                       </div>
                     )}
 
+                    {/* Pop-Up Market Details & Inventory/Register Actions */}
+                    {(evt.category === 'market' || evt.marketDetails) && (
+                      <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 p-2.5 space-y-2 text-xs font-mono">
+                        <div className="grid grid-cols-2 gap-2 text-[11px]">
+                          <div>
+                            <span className="text-[10px] text-amber-800 dark:text-amber-300 font-sans block">Booth Fee</span>
+                            <span className="font-bold text-stone-900 dark:text-stone-100">${evt.marketDetails?.boothFee || 0}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-amber-800 dark:text-amber-300 font-sans block">Actual Sales</span>
+                            <span className="font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                              ${(evt.marketDetails?.actualRevenue || 0).toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-1.5 pt-1.5 border-t border-amber-200/80 dark:border-amber-900/40">
+                          <span className="text-[10px] text-amber-900 dark:text-amber-200 font-sans">
+                            {evt.marketDetails?.inventory?.length 
+                              ? `${evt.marketDetails.inventory.reduce((a, b) => a + b.quantityPacked, 0)} items packed` 
+                              : '0 items packed'}
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setPackoutEvent(evt)}
+                              className="px-2 py-1 rounded bg-white dark:bg-[#1a1d22] border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
+                            >
+                              <Barcode className="w-3 h-3 text-amber-700" />
+                              <span>Inventory</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPosEvent(evt)}
+                              className="px-2.5 py-1 rounded bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
+                            >
+                              <ShoppingBag className="w-3 h-3" />
+                              <span>Register</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Specific Event Individual Tasks Section */}
                     <div className="pt-2 border-t border-[#f0ebe2] dark:border-[#2b2e36] space-y-2">
                       <div className="flex items-center justify-between text-xs">
@@ -581,7 +658,7 @@ export const DayInspector: React.FC<DayInspectorProps> = ({
             rows={3}
             value={dayNotes}
             onChange={(e) => handleNotesChange(e.target.value)}
-            placeholder={`Notes for ${fullDateLabel}...
+            placeholder={`Notes for ${dateHeading}...
 • Record bullet notes or thoughts
 • Auto-saved specifically for this day`}
             className="w-full text-xs p-2.5 rounded-lg border border-[#e4ded5] dark:border-[#353943] bg-white dark:bg-[#1a1d22] text-stone-800 dark:text-stone-200 focus:outline-none focus:ring-2 focus:ring-stone-900 dark:focus:ring-stone-100 whitespace-pre-wrap font-sans leading-relaxed"
@@ -590,15 +667,25 @@ export const DayInspector: React.FC<DayInspectorProps> = ({
 
       </div>
 
-      {/* Footer Bar */}
-      <div className="p-2.5 border-t border-[#e4ded5] dark:border-[#2d3139] bg-[#f5f1e8] dark:bg-[#202329] flex items-center justify-between text-xs">
-        <span className="text-stone-500 dark:text-stone-400 text-[11px] font-serif">
-          Shared Life Hub
-        </span>
-        <span className="text-[10px] text-stone-400 font-mono">
-          Auto-saved
-        </span>
-      </div>
+      {/* Market Packout Modal */}
+      {packoutEvent && (
+        <MarketPackoutModal
+          event={packoutEvent}
+          isOpen={true}
+          onClose={() => setPackoutEvent(null)}
+          onSavePackout={handleSavePackout}
+        />
+      )}
+
+      {/* Point of Sale Register Modal */}
+      {posEvent && (
+        <PointOfSaleRegisterModal
+          event={posEvent}
+          isOpen={true}
+          onClose={() => setPosEvent(null)}
+          onCompleteSale={handleCompleteSale}
+        />
+      )}
     </div>
   );
 };

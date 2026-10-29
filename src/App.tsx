@@ -45,7 +45,7 @@ function CalendarApp() {
   const [viewMode, setViewMode] = useState<CalendarViewMode>(() => {
     try {
       const saved = localStorage.getItem('duosync_view_mode');
-      if (saved && ['month', 'week', 'agenda', 'reflection'].includes(saved)) {
+      if (saved && ['month', 'week', 'day', 'agenda', 'reflection'].includes(saved)) {
         return saved as CalendarViewMode;
       }
     } catch (e) {}
@@ -368,6 +368,8 @@ function CalendarApp() {
       workspaceNotifications.gmail +
       workspaceNotifications.chat
     );
+  }, [workspaceNotifications]);
+
   // Mark partner invite alert seen whenever user navigates to admin view or opens workspace
   useEffect(() => {
     if (viewMode === 'admin' || isUnifiedWorkspaceOpen || isInviteModalOpen) {
@@ -922,6 +924,7 @@ function CalendarApp() {
                   onDeleteTaskFromEvent={handleDeleteTaskFromEvent}
                   onCopyTaskToDate={handleCopyTaskToDate}
                   onDeleteEvent={handleDeleteEvent}
+                  onUpdateEvent={handleUpdateEvent}
                   onOpenFridgePhotos={() => setIsFridgePhotosOpen(true)}
                   sortOption={sortOption}
                   sortDirection={sortDirection}

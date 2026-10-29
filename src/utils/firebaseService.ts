@@ -223,12 +223,35 @@ export function subscribeToHub(hubId: string, onUpdate: (hub: SharedHub) => void
 // Real-time Isolated Events Synchronization
 // ---------------------------------------------------------------------------
 
+/**
+ * Normalizes date values from Firestore (Timestamps, Dates, or strings) to YYYY-MM-DD
+ */
+export function normalizeDateString(val: any): string {
+  if (!val) return '';
+  if (typeof val.toDate === 'function') {
+    return val.toDate().toISOString().split('T')[0];
+  }
+  if (val instanceof Date) {
+    return val.toISOString().split('T')[0];
+  }
+  return String(val || '');
+}
+
 export function subscribeToEvents(hubId: string, onUpdate: (events: CalendarEvent[]) => void) {
   const eventsCol = collection(db, 'hubs', hubId, 'events');
   return onSnapshot(eventsCol, (snap) => {
     const list: CalendarEvent[] = [];
     snap.forEach((docSnap) => {
-      list.push(docSnap.data() as CalendarEvent);
+      const data = docSnap.data();
+      const rawDate = data.startDate || data.date;
+      const normalizedStartDate = normalizeDateString(rawDate);
+      const evt: CalendarEvent = {
+        ...(data as CalendarEvent),
+        id: docSnap.id || data.id,
+        startDate: normalizedStartDate,
+        ...(data.endDate ? { endDate: normalizeDateString(data.endDate) } : {})
+      };
+      list.push(evt);
     });
     onUpdate(list);
   }, (err) => {
@@ -259,8 +282,13 @@ export function subscribeToStays(hubId: string, onUpdate: (stays: Record<string,
   return onSnapshot(staysCol, (snap) => {
     const map: Record<string, DayStayInfo> = {};
     snap.forEach((docSnap) => {
-      const d = docSnap.data() as DayStayInfo;
-      map[d.date] = d;
+      const d = docSnap.data();
+      const rawDate = d.date || docSnap.id;
+      const normalizedDate = normalizeDateString(rawDate);
+      map[normalizedDate] = {
+        ...(d as DayStayInfo),
+        date: normalizedDate,
+      };
     });
     onUpdate(map);
   }, (err) => {
